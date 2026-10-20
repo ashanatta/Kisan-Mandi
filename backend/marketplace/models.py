@@ -255,5 +255,30 @@ class ListingReport(models.Model):
             models.UniqueConstraint(fields=['product', 'reporter'], name='one_report_per_user_per_listing'),
         ]
 
+    REMOVED_REASON = 'Removed after a user report.'
+
+    def apply_status(self):
+        """
+        Keep the listing in sync with the report:
+        "Action taken" hides it; dismissing or reopening restores it, but only if it
+        was hidden because of a report and no other report still has action taken.
+        """
+        product = self.product
+        if self.status == self.Status.RESOLVED:
+            if product.status != Product.Status.REJECTED:
+                product.status, product.rejection_reason = Product.Status.REJECTED, self.REMOVED_REASON
+                product.save(update_fields=['status', 'rejection_reason'])
+            return
+        hidden_by_report = product.status == Product.Status.REJECTED and product.rejection_reason == self.REMOVED_REASON
+        other_resolved = product.reports.filter(status=self.Status.RESOLVED).exclude(pk=self.pk).exists()
+        if hidden_by_report and not other_resolved:
+            product.status, product.rejection_reason = Product.Status.APPROVED, ''
+            product.save(update_fields=['status', 'rejection_reason'])
+
+    def set_status(self, status):
+        self.status = status
+        self.save(update_fields=['status'])
+        self.apply_status()
+
     def __str__(self):
         return f'{self.get_reason_display()} – {self.product}'

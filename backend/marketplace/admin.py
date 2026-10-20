@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.urls import reverse
+from django.utils.html import format_html
 
 from .models import Category, ListingReport, Product, ProductImage, SellerReview
 
@@ -51,15 +53,34 @@ class ListingReportAdmin(admin.ModelAdmin):
     list_filter = ('status', 'reason')
     search_fields = ('product__title', 'reporter__username', 'details')
     list_select_related = ('product', 'reporter')
+    readonly_fields = ('product_link', 'listing_status', 'reporter', 'reason', 'details', 'created_at')
+    fields = readonly_fields + ('status',)
     actions = ['hide_listing', 'dismiss']
 
-    @admin.action(description='🚫 Hide the reported listings and mark resolved')
-    def hide_listing(self, request, queryset):
-        Product.objects.filter(pk__in=queryset.values('product')).update(
-            status=Product.Status.REJECTED, rejection_reason='Removed after a user report.'
-        )
-        queryset.update(status=ListingReport.Status.RESOLVED)
+    @admin.display(description='Product')
+    def product_link(self, obj):
+        url = reverse('admin:marketplace_product_change', args=[obj.product_id])
+        return format_html('<a href="{}">{}</a>', url, obj.product)
 
-    @admin.action(description='Dismiss – the listing is fine')
+    @admin.display(description='Listing status now')
+    def listing_status(self, obj):
+        return obj.product.get_status_display()
+
+    def has_add_permission(self, request):
+        return False
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        # Setting the status here hides or restores the listing, same as the actions.
+        if 'status' in form.changed_data:
+            obj.apply_status()
+
+    @admin.action(description='🚫 Hide the reported listings (action taken)')
+    def hide_listing(self, request, queryset):
+        for report in queryset.select_related('product'):
+            report.set_status(ListingReport.Status.RESOLVED)
+
+    @admin.action(description='✅ Dismiss – the listing is fine (restores it if it was hidden)')
     def dismiss(self, request, queryset):
-        queryset.update(status=ListingReport.Status.DISMISSED)
+        for report in queryset.select_related('product'):
+            report.set_status(ListingReport.Status.DISMISSED)
