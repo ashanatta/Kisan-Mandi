@@ -322,10 +322,10 @@ function TrustSection() {
   const { t } = useTranslation()
   // Only claims the platform actually enforces.
   const points = [
+    ['🔒', 'trustEscrow', 'bg-brand-100'],
     ['🛡️', 'trustPoint1', 'bg-sky-100'],
     ['⭐', 'trustPoint2', 'bg-amber-100'],
-    ['✅', 'trustPoint3', 'bg-brand-100'],
-    ['🚩', 'trustPoint4', 'bg-red-100'],
+    ['⚖️', 'trustDispute', 'bg-red-100'],
   ]
   return (
     <section className="container-page mt-20">

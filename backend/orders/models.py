@@ -40,29 +40,45 @@ class Order(models.Model):
     """
     Checkout splits the cart into one order per seller, so each seller
     manages only their own orders and statuses.
+
+    Escrow lifecycle (Kisan Mandi Protection):
+    awaiting_payment → pending (paid, money held) → confirmed → shipped → delivered
+    → completed (buyer confirmed or protection window passed; money released to seller).
+    A buyer can open a dispute while shipped/delivered → disputed → admin decides
+    → refunded or completed. Cancelling a paid order refunds the buyer in full.
     """
 
     class Status(models.TextChoices):
-        PENDING = 'pending', 'Pending'
+        AWAITING_PAYMENT = 'awaiting_payment', 'Awaiting payment'
+        PENDING = 'pending', 'Paid – waiting for seller'
         CONFIRMED = 'confirmed', 'Confirmed'
         SHIPPED = 'shipped', 'Shipped'
         DELIVERED = 'delivered', 'Delivered'
+        COMPLETED = 'completed', 'Completed'
+        DISPUTED = 'disputed', 'Disputed'
+        REFUNDED = 'refunded', 'Refunded'
         CANCELLED = 'cancelled', 'Cancelled'
 
     class PaymentMethod(models.TextChoices):
-        COD = 'cod', 'Cash on Delivery'
+        COD = 'cod', 'Cash on Delivery'  # legacy – no longer accepted at checkout
         BANK = 'bank_transfer', 'Bank Transfer'
         EASYPAISA = 'easypaisa', 'Easypaisa'
         JAZZCASH = 'jazzcash', 'JazzCash'
 
-    # Allowed status changes; anything else is rejected by the API.
+    # Allowed status changes; who may make each one is decided in orders.services.
     ALLOWED_TRANSITIONS = {
+        Status.AWAITING_PAYMENT: {Status.PENDING, Status.CANCELLED},
         Status.PENDING: {Status.CONFIRMED, Status.CANCELLED},
         Status.CONFIRMED: {Status.SHIPPED, Status.CANCELLED},
-        Status.SHIPPED: {Status.DELIVERED},
-        Status.DELIVERED: set(),
+        Status.SHIPPED: {Status.DELIVERED, Status.DISPUTED},
+        Status.DELIVERED: {Status.COMPLETED, Status.DISPUTED},
+        Status.DISPUTED: {Status.COMPLETED, Status.REFUNDED},
+        Status.COMPLETED: set(),
+        Status.REFUNDED: set(),
         Status.CANCELLED: set(),
     }
+    # Statuses in which the buyer's money is held by the platform
+    PAID_STATUSES = (Status.PENDING, Status.CONFIRMED, Status.SHIPPED, Status.DELIVERED, Status.DISPUTED)
 
     order_number = models.CharField(max_length=20, unique=True, default=generate_order_number, editable=False)
     buyer = models.ForeignKey(
@@ -71,8 +87,14 @@ class Order(models.Model):
     seller = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='orders_received'
     )
-    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
-    payment_method = models.CharField(max_length=15, choices=PaymentMethod.choices, default=PaymentMethod.COD)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.AWAITING_PAYMENT)
+    payment_method = models.CharField(max_length=15, choices=PaymentMethod.choices, default=PaymentMethod.JAZZCASH)
+    payment = models.ForeignKey(
+        'payments.Payment', on_delete=models.PROTECT, null=True, blank=True, related_name='orders'
+    )
+    paid_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
 
     # Shipping details (copied at checkout)
     full_name = models.CharField(max_length=150)
@@ -99,6 +121,17 @@ class Order(models.Model):
 
     def can_transition_to(self, new_status):
         return new_status in self.ALLOWED_TRANSITIONS.get(self.status, set())
+
+    @property
+    def release_at(self):
+        """When held money is released automatically if the buyer reports no problem."""
+        from datetime import timedelta
+
+        from django.conf import settings as conf
+
+        if self.status != self.Status.DELIVERED or not self.delivered_at:
+            return None
+        return self.delivered_at + timedelta(days=conf.PROTECTION_DAYS)
 
     def recalculate_totals(self):
         self.subtotal = sum((item.line_total for item in self.items.all()), Decimal('0'))
@@ -133,7 +166,7 @@ class OrderItem(models.Model):
 
 class OrderStatusHistory(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='status_history')
-    status = models.CharField(max_length=10, choices=Order.Status.choices)
+    status = models.CharField(max_length=20, choices=Order.Status.choices)
     changed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
     )

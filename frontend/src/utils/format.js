@@ -22,8 +22,9 @@ export function categoryName(category, lang) {
 }
 
 /** 03001234567 / +923001234567 → 923001234567 for wa.me links. */
-export function toWhatsAppNumber(phone = '') {
-  const digits = phone.replace(/\D/g, '')
+export function toWhatsAppNumber(phone) {
+  // phone is null when the number is hidden until payment
+  const digits = (phone ?? '').replace(/\D/g, '')
   if (digits.startsWith('92')) return digits
   if (digits.startsWith('0')) return `92${digits.slice(1)}`
   return digits

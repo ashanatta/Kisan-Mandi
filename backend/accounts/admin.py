@@ -3,23 +3,34 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.urls import reverse
 from django.utils.html import format_html
 
-from .models import SellerVerification, User
+from .models import BannedCNIC, SellerStrike, SellerVerification, User
+from .penalties import ban
 
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ('username', 'email', 'first_name', 'last_name', 'role', 'is_verified', 'phone', 'city', 'is_active')
-    list_filter = ('role', 'is_verified', 'is_active', 'is_staff', 'city')
+    list_display = ('username', 'email', 'first_name', 'last_name', 'role', 'is_verified', 'is_banned', 'phone', 'city', 'is_active')
+    list_filter = ('role', 'is_verified', 'is_banned', 'is_active', 'is_staff', 'city')
+    actions = ['ban_sellers']
     search_fields = ('username', 'email', 'first_name', 'last_name', 'phone')
     fieldsets = BaseUserAdmin.fieldsets + (
         ('Agri Shop profile', {
             'fields': ('role', 'is_verified', 'phone', 'whatsapp', 'city', 'district', 'address', 'avatar',
                        'preferred_language'),
         }),
+        ('Kisan Mandi Protection', {
+            'fields': ('is_banned', 'suspended_until', 'payout_method', 'payout_account_title', 'payout_account_number'),
+        }),
     )
     add_fieldsets = BaseUserAdmin.add_fieldsets + (
         ('Agri Shop profile', {'fields': ('email', 'role', 'phone')}),
     )
+
+    @admin.action(description='🚫 Ban seller (blocks account + CNIC, refunds unshipped orders)')
+    def ban_sellers(self, request, queryset):
+        for user in queryset:
+            ban(user, f'Banned by admin {request.user}')
+        self.message_user(request, f'{queryset.count()} user(s) banned.', messages.WARNING)
 
 
 @admin.register(SellerVerification)
@@ -60,3 +71,15 @@ class SellerVerificationAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+@admin.register(SellerStrike)
+class SellerStrikeAdmin(admin.ModelAdmin):
+    list_display = ('seller', 'reason', 'order', 'created_at')
+    search_fields = ('seller__username', 'reason')
+
+
+@admin.register(BannedCNIC)
+class BannedCNICAdmin(admin.ModelAdmin):
+    list_display = ('cnic_number', 'user', 'reason', 'created_at')
+    search_fields = ('cnic_number',)

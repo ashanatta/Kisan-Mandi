@@ -13,6 +13,7 @@ import {
   HiPlus,
 } from 'react-icons/hi2'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import api from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { parseApiError } from '../utils/errors'
@@ -152,6 +153,36 @@ function Spec({ label, value }) {
   )
 }
 
+/** Opens (or reuses) an in-app chat with the seller about this listing. */
+function AskSellerButton({ product }) {
+  const { t } = useTranslation()
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [busy, setBusy] = useState(false)
+  if (user?.id === product.seller.id) return null
+
+  const start = async () => {
+    if (!user) {
+      navigate('/login', { state: { from: location } })
+      return
+    }
+    setBusy(true)
+    try {
+      const { data } = await api.post('/conversations/', { product_id: product.id })
+      navigate(`/messages/${data.id}`)
+    } catch (err) {
+      toast.error(parseApiError(err).message)
+      setBusy(false)
+    }
+  }
+  return (
+    <button type="button" disabled={busy} onClick={start} className="btn-primary mt-5 w-full">
+      💬 {t('chat.askSeller')}
+    </button>
+  )
+}
+
 function SellerCard({ seller, product }) {
   const { t, i18n } = useTranslation()
   const lang = i18n.resolvedLanguage
@@ -207,22 +238,31 @@ function SellerCard({ seller, product }) {
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        <a href={`tel:${seller.phone}`} className="btn-primary">
-          <HiOutlinePhone className="size-5" /> {t('product.call')}
-        </a>
-        <a
-          href={whatsapp}
-          target="_blank"
-          rel="noreferrer"
-          className="btn bg-whatsapp text-white shadow-lg shadow-green-500/25 hover:brightness-95 focus-visible:ring-green-200"
-        >
-          <FaWhatsapp className="size-5" /> {t('product.whatsapp')}
-        </a>
-      </div>
-      <p className="latin mt-3 text-center text-sm font-semibold text-stone-500" dir="ltr">
-        {seller.phone}
-      </p>
+      {seller.contact_visible ? (
+        <>
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <a href={`tel:${seller.phone}`} className="btn-primary">
+              <HiOutlinePhone className="size-5" /> {t('product.call')}
+            </a>
+            <a
+              href={whatsapp}
+              target="_blank"
+              rel="noreferrer"
+              className="btn bg-whatsapp text-white shadow-lg shadow-green-500/25 hover:brightness-95 focus-visible:ring-green-200"
+            >
+              <FaWhatsapp className="size-5" /> {t('product.whatsapp')}
+            </a>
+          </div>
+          <p className="latin mt-3 text-center text-sm font-semibold text-stone-500" dir="ltr">
+            {seller.phone}
+          </p>
+        </>
+      ) : (
+        <>
+          <AskSellerButton product={product} />
+          <p className="mt-3 rounded-2xl bg-stone-50 px-3 py-2 text-center text-xs text-stone-500">🔒 {t('escrow.numberHidden')}</p>
+        </>
+      )}
       <Link
         to={`/sellers/${seller.id}`}
         className="mt-3 flex items-center justify-center gap-1 text-sm font-semibold text-brand-700 hover:underline"

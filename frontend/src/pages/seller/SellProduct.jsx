@@ -82,9 +82,27 @@ function BecomeSeller() {
   )
 }
 
+/** Only CNIC-verified sellers in good standing can list (Kisan Mandi Protection rule). */
+function VerificationRequired() {
+  const { t } = useTranslation()
+  return (
+    <div className="container-page py-10">
+      <EmptyState
+        emoji="🪪"
+        title={t('sell.verifyFirstTitle')}
+        text={t('sell.verifyFirstText')}
+        action={<Link to="/account/verification" className="btn-accent">{t('trust.getVerified')}</Link>}
+      />
+    </div>
+  )
+}
+
 export default function SellProduct() {
   const { user } = useAuth()
+  const { id } = useParams()
   if (user.role === 'buyer') return <BecomeSeller />
+  // Editing existing listings stays possible; creating new ones needs verification.
+  if (!id && !user.can_sell && !user.is_platform_admin) return <VerificationRequired />
   return <ProductForm />
 }
 

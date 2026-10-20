@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .filters import ProductFilter
-from .models import Category, ListingReport, Product, SellerReview
+from .models import Category, ListingReport, Product, SellerReview, public_products_q
 from .permissions import IsSeller
 from .serializers import (
     CategorySerializer,
@@ -28,7 +28,6 @@ from .serializers import (
 
 User = get_user_model()
 
-PUBLIC_PRODUCTS = Q(status=Product.Status.APPROVED, is_active=True)
 
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -40,7 +39,7 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_field = 'slug'
 
     def get_queryset(self):
-        product_count = Count('products', filter=Q(products__status=Product.Status.APPROVED, products__is_active=True))
+        product_count = Count('products', filter=public_products_q('products__'))
         children = Category.objects.filter(is_active=True).annotate(product_count=product_count)
         queryset = (
             Category.objects.filter(is_active=True)
@@ -79,7 +78,7 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return (
-            Product.objects.filter(PUBLIC_PRODUCTS)
+            Product.objects.filter(public_products_q())
             .select_related('category', 'seller')
             .prefetch_related('images')
         )
@@ -127,6 +126,13 @@ class MyProductViewSet(viewsets.ModelViewSet):
 
     @extend_schema(responses=SellerProductSerializer)
     def create(self, request, *args, **kwargs):
+        user = request.user
+        if not (user.can_sell or user.is_superuser):
+            return Response(
+                {'detail': 'Verify your CNIC before posting listings. Only verified sellers can sell on Kisan Mandi.',
+                 'code': 'verification_required'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
@@ -207,7 +213,7 @@ def _delivered_order(buyer, seller_id):
     from orders.models import Order
 
     return (
-        Order.objects.filter(buyer=buyer, seller_id=seller_id, status=Order.Status.DELIVERED)
+        Order.objects.filter(buyer=buyer, seller_id=seller_id, status__in=[Order.Status.DELIVERED, Order.Status.COMPLETED])
         .order_by('-updated_at')
         .first()
     )
@@ -299,7 +305,7 @@ class ReportListingView(APIView):
 
     @extend_schema(request=ListingReportSerializer, responses={201: None})
     def post(self, request, pk):
-        product = get_object_or_404(Product.objects.filter(PUBLIC_PRODUCTS), pk=pk)
+        product = get_object_or_404(Product.objects.filter(public_products_q()), pk=pk)
         if product.seller_id == request.user.id:
             return Response({'detail': 'You cannot report your own listing.'}, status=status.HTTP_400_BAD_REQUEST)
         if ListingReport.objects.filter(product=product, reporter=request.user).exists():
@@ -322,7 +328,7 @@ class StatsView(APIView):
         'categories': serializers.IntegerField(),
     }))
     def get(self, request):
-        products = Product.objects.filter(PUBLIC_PRODUCTS)
+        products = Product.objects.filter(public_products_q())
         return Response({
             'products': products.count(),
             'sellers': products.values('seller').distinct().count(),

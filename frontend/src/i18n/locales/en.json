@@ -71,7 +71,11 @@
     "trustPoint3Title": "Every listing checked",
     "trustPoint3Text": "New listings are reviewed by our team before buyers can see them.",
     "trustPoint4Title": "Report anything suspicious",
-    "trustPoint4Text": "One tap to report. Our team reviews every report and removes fake listings."
+    "trustPoint4Text": "One tap to report. Our team reviews every report and removes fake listings.",
+    "trustEscrowTitle": "Your money is protected",
+    "trustEscrowText": "You pay Kisan Mandi, not the seller. The seller is paid only after you confirm the item arrived safely.",
+    "trustDisputeTitle": "Disputes & refunds",
+    "trustDisputeText": "Something wrong? Report it and the money stays held. Our team decides; refunds go back to you and cheating sellers are banned."
   },
   "products": {
     "title": "Marketplace",
@@ -243,7 +247,9 @@
     "currentPassword": "Current password",
     "newPassword": "New password",
     "updatePassword": "Update password",
-    "passwordChanged": "Password changed ✅"
+    "passwordChanged": "Password changed ✅",
+    "earnings": "My earnings",
+    "messages": "Messages"
   },
   "language": "Language",
   "sell": {
@@ -288,7 +294,9 @@
     "approvalNote": "An admin checks new listings before they go live.",
     "submitted": "Listing submitted! It will go live after approval ⏳",
     "updated": "Listing updated ✅",
-    "fixErrors": "Please fix the highlighted fields."
+    "fixErrors": "Please fix the highlighted fields.",
+    "verifyFirstTitle": "Verify your CNIC to start selling",
+    "verifyFirstText": "To protect buyers, only CNIC-verified sellers can post listings on Kisan Mandi. It takes a minute and is checked by our team."
   },
   "listings": {
     "subtitle": "Manage everything you are selling.",
@@ -320,11 +328,15 @@
     "rejected": "Rejected"
   },
   "orderStatus": {
-    "pending": "Pending",
+    "pending": "Paid",
     "confirmed": "Confirmed",
     "shipped": "Shipped",
     "delivered": "Delivered",
-    "cancelled": "Cancelled"
+    "cancelled": "Cancelled",
+    "awaiting_payment": "Awaiting payment",
+    "completed": "Completed",
+    "disputed": "Disputed",
+    "refunded": "Refunded"
   },
   "cart": {
     "title": "My cart",
@@ -355,13 +367,19 @@
     "placeOrder": "Place order",
     "successTitle": "Order placed!",
     "successText_one": "The seller has received your order and will contact you soon.",
-    "successText_other": "{{count}} sellers have received your orders and will contact you soon."
+    "successText_other": "{{count}} sellers have received your orders and will contact you soon.",
+    "noCod": "Cash on delivery is not available: only online payments to Kisan Mandi can be protected.",
+    "continueToPay": "Continue to payment",
+    "payNote": "Your money is held by Kisan Mandi until you receive your order."
   },
   "payment": {
-    "cod": "Cash on delivery",
     "easypaisa": "Easypaisa",
     "jazzcash": "JazzCash",
-    "bank_transfer": "Bank transfer"
+    "bank_transfer": "Bank transfer",
+    "comingSoon": "Coming soon",
+    "testMode": "Test mode",
+    "manualCheck": "Checked by our team",
+    "instant": "Instant"
   },
   "orders": {
     "placedSubtitle": "Track what you have bought.",
@@ -377,13 +395,16 @@
     "action_cancelled": "Cancel order",
     "done_confirmed": "Order confirmed",
     "done_shipped": "Marked as shipped",
-    "done_delivered": "Delivered 🎉 Linked sales were added to your farm accounts.",
-    "done_cancelled": "Order cancelled",
-    "trackerNote": "When you mark this delivered, sales of linked listings are added to your expense tracker as income.",
+    "done_delivered": "Marked as delivered. Money is released when the buyer confirms.",
+    "done_cancelled": "Order cancelled. Any payment will be refunded.",
+    "trackerNote": "Sales of linked listings are added to your expense tracker when the order completes.",
     "emptyTitle": "No orders yet",
     "emptyPlaced": "When you buy something, it will show up here.",
     "emptyReceived": "When buyers order your listings, they will show up here.",
-    "call": "Call"
+    "call": "Call",
+    "action_completed": "✅ I received it – release payment",
+    "done_completed": "Thank you! Payment released to the seller.",
+    "refunded": "Refunded to the buyer"
   },
   "tracker": {
     "subtitle": "Profit and loss for each of your farm businesses.",
@@ -540,7 +561,7 @@
     "reason_other": "Other",
     "safetyTitle": "Stay safe",
     "tipAnimal": "See the animal in person and check its teeth, health and milk before paying.",
-    "tip1": "Never send advance payment before you see the item.",
+    "tip1": "Never pay the seller directly. Only payments made on Kisan Mandi are protected.",
     "tip2": "Meet in a public place or at a known mandi, and take someone with you.",
     "tip3": "Prefer sellers with the ✔ Verified badge and good reviews.",
     "tip4": "If something feels wrong, report the listing.",
@@ -564,5 +585,137 @@
     "youAreVerified": "You are verified",
     "youAreVerifiedText": "Your profile and listings now show the Verified badge.",
     "viewMyProfile": "View my public profile"
+  },
+  "escrow": {
+    "title": "Kisan Mandi Protection",
+    "subtitle": "Your money is never at risk.",
+    "step1": "You pay Kisan Mandi – not the seller.",
+    "step2": "We hold the money safely while the seller sends your order.",
+    "step3": "Got it? Tap “I received it” – or report a problem within {{days}} days and get a refund.",
+    "awaitingPayment": "This order is waiting for payment. The seller can't see it yet.",
+    "payNow": "Pay now",
+    "held": "{{amount}} held safely by Kisan Mandi",
+    "heldBuyer": "The seller will be paid only after you receive your order.",
+    "heldSeller": "The buyer has paid. You will receive the money after delivery.",
+    "heldDispute": "Money is frozen until our team decides the dispute.",
+    "releaseOnBuyer": "If you don't report a problem, the money goes to the seller on {{date}}.",
+    "releaseOnSeller": "Money will be released to you on {{date}} if the buyer reports no problem.",
+    "released": "Money released",
+    "sale": "Sale",
+    "commission": "Commission",
+    "youGet": "You get",
+    "payoutPending": "Payout being sent to your account",
+    "payoutPaid": "Paid to your account",
+    "completedBuyer": "Order completed and money released to the seller.",
+    "refund": "Refund {{amount}}",
+    "refundPending": "being sent back to you",
+    "refundSent": "sent to you",
+    "contactAfterPayment": "Phone number is shown after payment",
+    "numberHidden": "The seller's number is shown after you pay through Kisan Mandi. Ask questions in chat until then.",
+    "confirmRelease": "Did you receive everything in good condition? {{amount}} will be released to the seller. This cannot be undone."
+  },
+  "pay": {
+    "amountToPay": "Amount to pay",
+    "timeLeft": "Time left",
+    "testNote": "TEST MODE: no real money moves. Choose what the payment gateway would answer.",
+    "testSuccess": "Payment successful",
+    "testFail": "Payment failed",
+    "payWith": "Pay with {{method}}",
+    "bankName": "Bank",
+    "accountTitle": "Account title",
+    "accountNumber": "Account / IBAN",
+    "amountToSend": "Amount",
+    "reference": "Write this reference",
+    "bankHint": "Send the exact amount, then enter the transaction ID and upload a photo of the receipt. Our team will confirm it.",
+    "bankTxnId": "Bank transaction ID",
+    "receipt": "Receipt photo",
+    "submitReceipt": "Submit receipt",
+    "copied": "Copied",
+    "paidTitle": "Payment received!",
+    "paidText": "{{amount}} is now held safely by Kisan Mandi. The sellers have been told to prepare your order.",
+    "verifyingTitle": "Checking your transfer",
+    "verifyingText": "Our team will match your receipt with the bank statement. Your order goes to the seller once confirmed.",
+    "failedTitle": "Payment didn't go through",
+    "expiredTitle": "Payment time ran out",
+    "backInCart": "No money was taken. Your items are back in your cart.",
+    "tryAgain": "Try again",
+    "notFound": "Payment not found."
+  },
+  "orderSteps": {
+    "pending": "Paid",
+    "confirmed": "Confirmed",
+    "shipped": "Shipped",
+    "delivered": "Delivered",
+    "completed": "Completed"
+  },
+  "dispute": {
+    "title": "Problem reported",
+    "reportProblem": "Report a problem",
+    "moneySafe": "Don't worry: the money stays held by Kisan Mandi and is NOT paid to the seller until our team decides.",
+    "describe": "What happened? Give details – dates, quantities, what you were promised…",
+    "photos": "Photos (proof)",
+    "photosHint": "Up to 6 photos – the item, packaging, receipts, chat screenshots.",
+    "submit": "Report problem & hold payment",
+    "opened": "Problem reported. The payment is frozen and the seller has 48 hours to respond.",
+    "respondTitle": "Respond to the buyer",
+    "responsePlaceholder": "Explain your side…",
+    "sendResponse": "Send",
+    "responded": "Sent. Our team will review both sides.",
+    "addPhotos": "Add more photos",
+    "noResponseYet": "No response yet",
+    "underReview": "Our team is reviewing both sides. Usually 2–3 working days.",
+    "decision": "Decision",
+    "decision_refund_full": "Full refund to the buyer",
+    "decision_refund_partial": "Partial refund, rest to the seller",
+    "decision_release": "Claim rejected – money released to the seller",
+    "decision_fraud": "Fraud – full refund and seller banned",
+    "reason_not_received": "Item not received",
+    "reason_not_as_described": "Not as described",
+    "reason_damaged": "Damaged / poor quality",
+    "reason_sick_animal": "Animal sick, injured or died",
+    "reason_fake": "Fake item / fraud",
+    "reason_other": "Other"
+  },
+  "chat": {
+    "title": "Messages",
+    "askSeller": "Ask the seller",
+    "empty": "No conversations yet",
+    "emptyText": "Open a listing and tap “Ask the seller”.",
+    "pick": "Choose a conversation",
+    "placeholder": "Write a message…",
+    "send": "Send",
+    "lockedNote": "For your safety, phone numbers and links are hidden until an order is paid through Kisan Mandi.",
+    "maskedToast": "Phone numbers and links are hidden until payment – this keeps you protected.",
+    "maskedLabel": "contact hidden"
+  },
+  "earnings": {
+    "title": "My earnings",
+    "subtitle": "Money from your sales, protected by Kisan Mandi.",
+    "inEscrow": "Held for active orders",
+    "inEscrowHint": "Released when buyers confirm delivery",
+    "toBePaid": "Released – being paid",
+    "toBePaidHint": "Sent to your payout account",
+    "paidOut": "Paid to you",
+    "payouts": "Payouts",
+    "none": "No payouts yet. Complete your first order!",
+    "order": "Order",
+    "status": "Status",
+    "addPayoutAccount": "Add your JazzCash / Easypaisa / bank account so we can send your money →"
+  },
+  "payout": {
+    "title": "Payout account",
+    "subtitle": "Where Kisan Mandi sends your money after an order completes.",
+    "jazzcash": "JazzCash",
+    "easypaisa": "Easypaisa",
+    "bank": "Bank account",
+    "accountTitle": "Account holder name",
+    "walletNumber": "Wallet mobile number"
+  },
+  "penalty": {
+    "warning": "Warning",
+    "warningText_one": "You lost {{count}} dispute. 2 lost disputes = 30-day suspension, 3 = permanent ban.",
+    "warningText_other": "You lost {{count}} disputes. 2 lost disputes = 30-day suspension, 3 = permanent ban.",
+    "suspended": "Your selling is suspended",
+    "suspendedText": "After losing disputes your listings are hidden until {{date}}. One more lost dispute means a permanent ban."
   }
 }
