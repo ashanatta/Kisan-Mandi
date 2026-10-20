@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  /* Latin font first: it has no Urdu glyphs, so Urdu falls through to Nastaliq
+     while English words inside Urdu pages keep the clean Latin font. */
+  --font-urdu: "Plus Jakarta Sans", "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", serif;
+
+  /* Leaf green */
+  --color-brand-50: #f0f9f1;
+  --color-brand-100: #dcf1df;
+  --color-brand-200: #bbe3c1;
+  --color-brand-300: #8ccd97;
+  --color-brand-400: #57b068;
+  --color-brand-500: #349349;
+  --color-brand-600: #247638;
+  --color-brand-700: #1e5e2f;
+  --color-brand-800: #1b4b29;
+  --color-brand-900: #173e23;
+  --color-brand-950: #0a2212;
+
+  /* Warm page background and soil brown */
+  --color-cream: #fbf8ef;
+  --color-soil: #5b3a1e;
+  --color-whatsapp: #25d366;
+
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-float-slow: float 8s ease-in-out infinite;
+  --animate-fade-up: fade-up 0.6s ease-out both;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-cream font-sans text-stone-800 antialiased;
+  }
+
+  /* Nastaliq needs extra line height to avoid clipped letters */
+  html[dir="rtl"] body {
+    @apply font-urdu;
+    line-height: 2.1;
+  }
+
+  html[dir="rtl"] :is(h1, h2, h3, h4) {
+    line-height: 1.9;
+  }
+
+  /* Numbers and prices stay in the Latin font even in Urdu */
+  .latin {
+    font-family: var(--font-sans);
+  }
+}
+
+/* Reusable component classes (Tailwind v4 needs @utility so they can be combined) */
+@utility container-page {
+  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+}
+
+@utility btn {
+  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-5 text-base font-semibold transition
+    focus-visible:outline-none focus-visible:ring-4 disabled:cursor-not-allowed disabled:opacity-60 active:scale-[0.98];
+}
+
+@utility btn-primary {
+  @apply btn bg-brand-600 text-white shadow-lg shadow-brand-600/25 hover:bg-brand-700 focus-visible:ring-brand-300;
+}
+
+@utility btn-accent {
+  @apply btn bg-amber-400 text-brand-950 shadow-lg shadow-amber-500/30 hover:bg-amber-300 focus-visible:ring-amber-200;
+}
+
+@utility btn-outline {
+  @apply btn border-2 border-brand-200 bg-white text-brand-800 hover:border-brand-400 hover:bg-brand-50 focus-visible:ring-brand-200;
+}
+
+@utility btn-ghost {
+  @apply btn text-brand-800 hover:bg-brand-100;
+}
+
+@utility input {
+  @apply min-h-12 w-full rounded-2xl border-2 border-stone-200 bg-white px-4 text-base text-stone-800 outline-none transition
+    placeholder:text-stone-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-100;
+}
+
+@utility card {
+  @apply rounded-3xl border border-stone-200/70 bg-white shadow-sm;
+}
+
+@utility chip {
+  @apply inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border-2 px-4 text-sm font-semibold transition;
+}
+
+@utility section-title {
+  @apply text-2xl font-extrabold tracking-tight text-brand-950 sm:text-3xl;
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
