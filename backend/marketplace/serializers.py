@@ -62,7 +62,6 @@ class ProductListSerializer(serializers.ModelSerializer):
         url = images[0].image.url
         return request.build_absolute_uri(url) if request else url
 
-
 class SellerInfoSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField(source='__str__')
