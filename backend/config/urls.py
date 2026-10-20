@@ -31,6 +31,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
     path('api/tracker/', include('tracker.urls')),
+    path('api/payments/', include('payments.urls')),
+    path('api/conversations/', include('chat.urls')),
     path('api/', include('marketplace.urls')),
     path('api/', include('orders.urls')),
 

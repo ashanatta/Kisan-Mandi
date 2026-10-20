@@ -69,12 +69,15 @@ class SellerInfoSerializer(serializers.Serializer):
 
     id = serializers.IntegerField()
     name = serializers.CharField(source='__str__')
-    phone = serializers.CharField()
-    whatsapp = serializers.CharField()
+    # Hidden until the viewer has paid for an order from this seller (anti-scam rule)
+    phone = serializers.SerializerMethodField()
+    whatsapp = serializers.SerializerMethodField()
+    contact_visible = serializers.SerializerMethodField()
     city = serializers.CharField()
     district = serializers.CharField()
     member_since = serializers.DateTimeField(source='date_joined')
     is_verified = serializers.BooleanField()
+    disputes_lost = serializers.SerializerMethodField()
     rating = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
     listings_count = serializers.SerializerMethodField()
@@ -96,7 +99,28 @@ class SellerInfoSerializer(serializers.Serializer):
         return user.products.filter(status=Product.Status.APPROVED, is_active=True).count()
 
     def get_completed_orders(self, user) -> int:
-        return user.orders_received.filter(status='delivered').count()
+        return user.orders_received.filter(status__in=['delivered', 'completed']).count()
+
+    def get_disputes_lost(self, user) -> int:
+        return user.strikes.count()
+
+    def get_contact_visible(self, user) -> bool:
+        from orders.services import has_paid_order
+
+        cache = self.__dict__.setdefault('_contact_cache', {})
+        if user.pk not in cache:
+            viewer = getattr(self.context.get('request'), 'user', None)
+            cache[user.pk] = bool(
+                viewer is not None and viewer.is_authenticated
+                and (viewer.id == user.id or viewer.is_platform_admin or has_paid_order(viewer, user))
+            )
+        return cache[user.pk]
+
+    def get_phone(self, user) -> str | None:
+        return user.phone if self.get_contact_visible(user) else None
+
+    def get_whatsapp(self, user) -> str | None:
+        return user.whatsapp if self.get_contact_visible(user) else None
 
 
 class SellerProfileSerializer(SellerInfoSerializer):

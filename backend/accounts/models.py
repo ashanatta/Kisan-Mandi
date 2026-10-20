@@ -53,6 +53,20 @@ class User(AbstractUser):
     # Set when an admin approves the user's CNIC verification.
     is_verified = models.BooleanField('Verified seller', default=False)
 
+    # Penalties from lost disputes (see accounts.penalties)
+    suspended_until = models.DateTimeField(null=True, blank=True)
+    is_banned = models.BooleanField(default=False)
+
+    # Where the platform sends this seller's released money
+    class PayoutMethod(models.TextChoices):
+        JAZZCASH = 'jazzcash', 'JazzCash'
+        EASYPAISA = 'easypaisa', 'Easypaisa'
+        BANK = 'bank', 'Bank account'
+
+    payout_method = models.CharField(max_length=10, choices=PayoutMethod.choices, blank=True)
+    payout_account_title = models.CharField(max_length=150, blank=True)
+    payout_account_number = models.CharField(max_length=34, blank=True, help_text='Mobile wallet number or IBAN')
+
     REQUIRED_FIELDS = ['email']
 
     def save(self, *args, **kwargs):
@@ -69,8 +83,50 @@ class User(AbstractUser):
     def is_platform_admin(self):
         return self.role == self.Role.ADMIN or self.is_superuser
 
+    @property
+    def is_suspended(self):
+        from django.utils import timezone
+
+        return bool(self.suspended_until and self.suspended_until > timezone.now())
+
+    @property
+    def can_sell(self):
+        """Only CNIC-verified sellers in good standing can list and receive orders."""
+        return (self.is_seller or self.is_platform_admin) and self.is_verified and not self.is_banned and not self.is_suspended
+
     def __str__(self):
         return self.get_full_name() or self.username
+
+
+class SellerStrike(models.Model):
+    """A penalty point, given when a dispute is decided against the seller."""
+
+    seller = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='strikes')
+    order = models.ForeignKey('orders.Order', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    reason = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Strike: {self.seller} – {self.reason}'
+
+
+class BannedCNIC(models.Model):
+    """A banned person can't get verified again with a new account."""
+
+    cnic_number = models.CharField(max_length=15, unique=True, validators=[cnic_validator])
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    reason = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'banned CNIC'
+        verbose_name_plural = 'banned CNICs'
+
+    def __str__(self):
+        return self.cnic_number
 
 
 class SellerVerification(models.Model):

@@ -69,7 +69,10 @@ export default function SellerProfile() {
                   </span>
                 </p>
               </div>
-              {!isMe && (
+              {!isMe && !s.contact_visible && (
+                <p className="w-full rounded-2xl bg-white/10 px-4 py-2 text-sm text-brand-100 sm:w-auto">🔒 {t('escrow.numberHidden')}</p>
+              )}
+              {!isMe && s.contact_visible && (
                 <div className="flex w-full gap-2 sm:w-auto">
                   <a href={`tel:${s.phone}`} className="btn flex-1 bg-white text-brand-900 hover:bg-brand-50 sm:flex-none">
                     <HiOutlinePhone className="size-5" /> {t('product.call')}

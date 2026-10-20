@@ -45,6 +45,25 @@ Open http://127.0.0.1:5173/
 | Seller | `aslam` | `Demo@12345` |
 | Buyer | `ali` | `Demo@12345` |
 
+## Kisan Mandi Protection (escrow)
+
+Buyers pay the platform, never the seller. Money is held until the buyer confirms delivery
+(or `PROTECTION_DAYS` pass without a complaint), then released to the seller as a payout.
+Disputes freeze the money until an admin decides in **Django admin → Disputes**; refunds and
+payouts are sent by an admin and recorded in **Refunds** / **Payouts**.
+
+- Only CNIC-verified sellers can list; seller phone numbers are hidden until a buyer has paid.
+- Losing disputes gives strikes: 2 = 30-day suspension, 3 or proven fraud = ban (CNIC blocked).
+- Locally, `PAYMENT_TEST_MODE=True` gives a simulated gateway. Put your JazzCash merchant
+  credentials in `backend/.env` to use the JazzCash sandbox, and set `PAYMENT_TEST_MODE=False`
+  in production.
+- Run this every few minutes in production (cron / Windows Task Scheduler) to expire unpaid
+  checkouts and auto-release money:
+
+  ```powershell
+  .\venv\Scripts\python.exe manage.py process_escrow
+  ```
+
 ## Project structure
 
 ```

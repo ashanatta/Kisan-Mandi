@@ -53,6 +53,8 @@ INSTALLED_APPS = [
     'marketplace',
     'orders',
     'tracker',
+    'payments',
+    'chat',
 ]
 
 MIDDLEWARE = [
@@ -220,8 +222,37 @@ SPECTACULAR_SETTINGS = {
     'ENUM_NAME_OVERRIDES': {
         'OrderStatusEnum': 'orders.models.Order.Status',
         'ProductStatusEnum': 'marketplace.models.Product.Status',
+        'DisputeReasonEnum': 'payments.models.Dispute.Reason',
+        'ReportReasonEnum': 'marketplace.models.ListingReport.Reason',
     },
 }
+
+
+# Kisan Mandi Protection (escrow)
+# Buyers pay the platform; money is released to the seller only after the buyer
+# confirms delivery or the protection window passes without a dispute.
+
+FRONTEND_URL = config('FRONTEND_URL', default='http://127.0.0.1:5173')
+PROTECTION_DAYS = config('PROTECTION_DAYS', default=3, cast=int)
+PAYMENT_EXPIRY_MINUTES = config('PAYMENT_EXPIRY_MINUTES', default=30, cast=int)
+SELLER_RESPONSE_HOURS = config('SELLER_RESPONSE_HOURS', default=48, cast=int)
+PLATFORM_COMMISSION_PERCENT = config('PLATFORM_COMMISSION_PERCENT', default='0')
+
+# Test gateway: lets you simulate successful / failed payments locally.
+# Never enable in production.
+PAYMENT_TEST_MODE = config('PAYMENT_TEST_MODE', default=DEBUG, cast=bool)
+
+# JazzCash hosted checkout (page redirection). Leave empty until you have credentials.
+JAZZCASH_MERCHANT_ID = config('JAZZCASH_MERCHANT_ID', default='')
+JAZZCASH_PASSWORD = config('JAZZCASH_PASSWORD', default='')
+JAZZCASH_INTEGRITY_SALT = config('JAZZCASH_INTEGRITY_SALT', default='')
+JAZZCASH_SANDBOX = config('JAZZCASH_SANDBOX', default=True, cast=bool)
+JAZZCASH_RETURN_URL = config('JAZZCASH_RETURN_URL', default='http://127.0.0.1:8000/api/payments/jazzcash/return/')
+
+# Platform bank account for manual bank transfers (verified by an admin).
+PLATFORM_BANK_NAME = config('PLATFORM_BANK_NAME', default='')
+PLATFORM_BANK_ACCOUNT_TITLE = config('PLATFORM_BANK_ACCOUNT_TITLE', default='')
+PLATFORM_BANK_ACCOUNT_NUMBER = config('PLATFORM_BANK_ACCOUNT_NUMBER', default='')
 
 
 # CORS (React dev server)

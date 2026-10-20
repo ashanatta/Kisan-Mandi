@@ -16,14 +16,92 @@ const ACTIONS = {
     ['➕', 'addProduct', '/sell', 'bg-amber-100'],
     ['📦', 'myListings', '/my/listings', 'bg-lime-100'],
     ['📥', 'receivedOrders', '/orders/received', 'bg-sky-100'],
+    ['💰', 'earnings', '/my/earnings', 'bg-emerald-100'],
+    ['💬', 'messages', '/messages', 'bg-violet-100'],
     ['📊', 'tracker', '/tracker', 'bg-brand-100'],
   ],
   buyer: [
     ['🌾', 'browse', '/products', 'bg-amber-100'],
     ['🛒', 'cart', '/cart', 'bg-lime-100'],
     ['📦', 'myOrders', '/orders', 'bg-sky-100'],
+    ['💬', 'messages', '/messages', 'bg-violet-100'],
     ['📊', 'tracker', '/tracker', 'bg-brand-100'],
   ],
+}
+
+/** Where a seller receives released money. */
+function PayoutForm({ user }) {
+  const { t } = useTranslation()
+  const { updateProfile } = useAuth()
+  const [form, setForm] = useState({
+    payout_method: user.payout_method || 'jazzcash',
+    payout_account_title: user.payout_account_title || user.full_name,
+    payout_account_number: user.payout_account_number,
+  })
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setErrors({})
+    try {
+      await updateProfile(form)
+      toast.success(t('account.saved'))
+    } catch (err) {
+      setErrors(parseApiError(err).fields)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="card p-6" noValidate>
+      <h2 className="text-xl font-extrabold text-brand-950">💸 {t('payout.title')}</h2>
+      <p className="mt-1 text-sm text-stone-600">{t('payout.subtitle')}</p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {['jazzcash', 'easypaisa', 'bank'].map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setForm({ ...form, payout_method: m })}
+            className={`chip ${form.payout_method === m ? 'border-brand-600 bg-brand-600 text-white' : 'border-stone-200 bg-white text-stone-700'}`}
+          >
+            {t(`payout.${m}`)}
+          </button>
+        ))}
+      </div>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <FormField label={t('payout.accountTitle')} value={form.payout_account_title} onChange={(e) => setForm({ ...form, payout_account_title: e.target.value })} error={errors.payout_account_title} />
+        <FormField
+          label={form.payout_method === 'bank' ? 'IBAN' : t('payout.walletNumber')}
+          className="latin"
+          value={form.payout_account_number}
+          onChange={(e) => setForm({ ...form, payout_account_number: e.target.value })}
+          error={errors.payout_account_number}
+          placeholder={form.payout_method === 'bank' ? 'PK36SCBL0000001123456702' : '03001234567'}
+        />
+      </div>
+      <button type="submit" disabled={busy} className="btn-primary mt-5">{busy ? t('auth.pleaseWait') : t('account.save')}</button>
+    </form>
+  )
+}
+
+/** Strikes and suspension, shown honestly to the seller. */
+function StandingNotice({ user }) {
+  const { t, i18n } = useTranslation()
+  if (!user.strikes && !user.suspended_until) return null
+  const suspended = user.suspended_until && new Date(user.suspended_until) > new Date()
+  return (
+    <div className={`rounded-3xl border p-5 ${suspended ? 'border-red-300 bg-red-50 text-red-900' : 'border-amber-300 bg-amber-50 text-amber-900'}`}>
+      <p className="font-extrabold">{suspended ? `⛔ ${t('penalty.suspended')}` : `⚠️ ${t('penalty.warning')}`}</p>
+      <p className="mt-1 text-sm">
+        {suspended
+          ? t('penalty.suspendedText', { date: new Date(user.suspended_until).toLocaleDateString(i18n.resolvedLanguage === 'ur' ? 'ur-PK' : 'en-PK') })
+          : t('penalty.warningText', { count: user.strikes })}
+      </p>
+    </div>
+  )
 }
 
 function ProfileForm({ user }) {
@@ -200,8 +278,10 @@ export default function Account() {
         </div>
       </section>
 
+      {user.role !== 'buyer' && <StandingNotice user={user} />}
+
       {/* Quick actions */}
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         {actions.map(([emoji, key, to, bg]) => (
           <Link key={key} to={to} className="card group flex items-center gap-3 p-4 transition hover:-translate-y-0.5 hover:shadow-md">
             <span className={`grid size-12 shrink-0 place-items-center rounded-2xl text-2xl ${bg}`}>{emoji}</span>
@@ -249,6 +329,8 @@ export default function Account() {
           </a>
         </section>
       )}
+
+      {user.role !== 'buyer' && <PayoutForm user={user} />}
 
       <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
         <ProfileForm user={user} />

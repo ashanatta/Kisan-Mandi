@@ -6,7 +6,7 @@ import OrderCard from '../components/OrderCard'
 import PageHeader from '../components/PageHeader'
 import useApi from '../hooks/useApi'
 
-const TABS = ['', 'pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
+const TABS = ['', 'awaiting_payment', 'pending', 'confirmed', 'shipped', 'delivered', 'disputed', 'completed', 'refunded', 'cancelled']
 
 /** Orders I placed (`as="buyer"`) or orders I received as a seller (`as="seller"`). */
 export default function Orders({ as = 'buyer' }) {
@@ -37,7 +37,7 @@ export default function Orders({ as = 'buyer' }) {
       />
 
       <div className="no-scrollbar -mx-4 mb-5 flex gap-2 overflow-x-auto px-4">
-        {TABS.map((key) => {
+        {TABS.filter((key) => !(as === 'seller' && key === 'awaiting_payment')).map((key) => {
           const n = key ? tabCounts?.[key] : total
           return (
             <button
@@ -48,7 +48,7 @@ export default function Orders({ as = 'buyer' }) {
             >
               {key ? t(`orderStatus.${key}`) : t('products.all')}
               {n != null && (
-                <span className={`latin rounded-full px-1.5 text-xs ${tab === key ? 'bg-white/20' : key === 'pending' && n ? 'bg-amber-400 text-brand-950' : 'bg-stone-100'}`}>{n}</span>
+                <span className={`latin rounded-full px-1.5 text-xs ${tab === key ? 'bg-white/20' : ['pending', 'disputed', 'awaiting_payment'].includes(key) && n ? 'bg-amber-400 text-brand-950' : 'bg-stone-100'}`}>{n}</span>
               )}
             </button>
           )

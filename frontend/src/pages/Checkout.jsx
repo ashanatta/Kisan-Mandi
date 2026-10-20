@@ -1,44 +1,23 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import api from '../api/client'
 import FormField from '../components/FormField'
 import PageHeader from '../components/PageHeader'
+import ProtectionBanner from '../components/trust/ProtectionBanner'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
+import useApi from '../hooks/useApi'
 import { parseApiError } from '../utils/errors'
 import { formatNumber, formatPrice } from '../utils/format'
 import { PAYMENT_METHODS } from '../utils/labels'
-
-function Success({ orders }) {
-  const { t } = useTranslation()
-  return (
-    <div className="container-page grid min-h-[60svh] place-items-center py-10">
-      <div className="card max-w-lg p-8 text-center">
-        <div className="mx-auto grid size-24 animate-float place-items-center rounded-full bg-brand-100 text-5xl">🎉</div>
-        <h1 className="mt-6 text-3xl font-extrabold text-brand-950">{t('checkout.successTitle')}</h1>
-        <p className="mt-2 text-stone-600">{t('checkout.successText', { count: orders.length })}</p>
-        <ul className="mt-5 space-y-2">
-          {orders.map((o) => (
-            <li key={o.id} className="flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3 text-start">
-              <span>
-                <span className="latin block font-bold text-stone-900">{o.order_number}</span>
-                <span className="text-sm text-stone-500">👨‍🌾 {o.seller.name}</span>
-              </span>
-              <span className="latin font-extrabold text-brand-700">{formatPrice(o.total)}</span>
-            </li>
-          ))}
-        </ul>
-        <Link to="/orders" className="btn-primary mt-6 w-full">{t('account.myOrders')}</Link>
-      </div>
-    </div>
-  )
-}
 
 export default function Checkout() {
   const { t } = useTranslation()
   const { user } = useAuth()
   const { cart, loading, reset } = useCart()
+  const navigate = useNavigate()
+  const methods = useApi('/payments/methods/')
   const [form, setForm] = useState({
     full_name: user.full_name,
     phone: user.phone,
@@ -46,16 +25,16 @@ export default function Checkout() {
     city: user.city,
     district: user.district || user.city,
     notes: '',
-    payment_method: 'cod',
+    payment_method: '',
   })
   const [errors, setErrors] = useState({})
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
-  const [placed, setPlaced] = useState(null)
 
-  if (placed) return <Success orders={placed} />
   if (!loading && cart.items.length === 0) return <Navigate to="/cart" replace />
 
+  const available = methods.data?.methods ?? []
+  const chosen = form.payment_method || available.find((m) => m.enabled)?.key || ''
   const field = (key) => ({ value: form[key] ?? '', onChange: (e) => setForm({ ...form, [key]: e.target.value }), error: errors[key] })
 
   const submit = async (e) => {
@@ -64,13 +43,13 @@ export default function Checkout() {
     setErrors({})
     setMessage('')
     try {
-      const { data } = await api.post('/orders/checkout/', form)
+      const { data } = await api.post('/orders/checkout/', { ...form, payment_method: chosen })
       reset()
-      setPlaced(data)
+      navigate(`/pay/${data.payment_reference}`, { replace: true })
     } catch (err) {
       const parsed = parseApiError(err)
       setErrors(parsed.fields)
-      setMessage(parsed.message)
+      setMessage(parsed.message || parsed.fields.payment_method || '')
     } finally {
       setBusy(false)
     }
@@ -82,6 +61,8 @@ export default function Checkout() {
       <form onSubmit={submit} noValidate className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <div className="space-y-5">
           {message && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 font-semibold text-red-700">{message}</div>}
+
+          <ProtectionBanner days={methods.data?.protection_days} />
 
           <section className="card p-6">
             <h2 className="mb-4 text-lg font-extrabold text-brand-950">🏠 {t('checkout.delivery')}</h2>
@@ -100,21 +81,39 @@ export default function Checkout() {
 
           <section className="card p-6">
             <h2 className="mb-4 text-lg font-extrabold text-brand-950">💳 {t('checkout.payment')}</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {Object.entries(PAYMENT_METHODS).map(([key, emoji]) => (
+            {methods.loading && <div className="h-20 animate-pulse rounded-2xl bg-stone-200/60" />}
+            <div className="grid gap-3 sm:grid-cols-3">
+              {available.map(({ key, enabled, mode }) => (
                 <label
                   key={key}
-                  className={`flex min-h-16 cursor-pointer items-center gap-3 rounded-2xl border-2 px-4 transition ${
-                    form.payment_method === key ? 'border-brand-500 bg-brand-50' : 'border-stone-200 bg-white hover:border-brand-200'
+                  className={`relative flex min-h-20 flex-col justify-center gap-1 rounded-2xl border-2 px-4 py-3 transition ${
+                    !enabled
+                      ? 'cursor-not-allowed border-stone-200 bg-stone-50 opacity-60'
+                      : chosen === key
+                        ? 'cursor-pointer border-brand-500 bg-brand-50'
+                        : 'cursor-pointer border-stone-200 bg-white hover:border-brand-200'
                   }`}
                 >
-                  <input type="radio" name="payment" value={key} checked={form.payment_method === key} onChange={() => setForm({ ...form, payment_method: key })} className="size-5 accent-brand-600" />
-                  <span className="text-2xl">{emoji}</span>
-                  <span className="font-bold text-stone-800">{t(`payment.${key}`)}</span>
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="payment"
+                      value={key}
+                      disabled={!enabled}
+                      checked={chosen === key}
+                      onChange={() => setForm({ ...form, payment_method: key })}
+                      className="size-5 accent-brand-600"
+                    />
+                    <span className="text-2xl">{PAYMENT_METHODS[key]}</span>
+                    <span className="font-bold text-stone-800">{t(`payment.${key}`)}</span>
+                  </span>
+                  <span className="text-xs font-semibold text-stone-500">
+                    {!enabled ? t('payment.comingSoon') : mode === 'test' ? `🧪 ${t('payment.testMode')}` : mode === 'manual' ? t('payment.manualCheck') : t('payment.instant')}
+                  </span>
                 </label>
               ))}
             </div>
-            <p className="mt-3 text-sm text-stone-500">ℹ️ {t('checkout.paymentNote')}</p>
+            <p className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">🚫 {t('checkout.noCod')}</p>
           </section>
         </div>
 
@@ -139,9 +138,10 @@ export default function Checkout() {
               <span className="font-bold">{t('cart.total')}</span>
               <span className="latin font-extrabold text-brand-700">{formatPrice(cart.subtotal)}</span>
             </div>
-            <button type="submit" disabled={busy || loading} className="btn-accent mt-5 w-full">
-              {busy ? t('auth.pleaseWait') : t('checkout.placeOrder')}
+            <button type="submit" disabled={busy || loading || !chosen} className="btn-accent mt-5 w-full">
+              🔒 {busy ? t('auth.pleaseWait') : t('checkout.continueToPay')}
             </button>
+            <p className="mt-3 text-center text-xs text-stone-500">{t('checkout.payNote')}</p>
           </div>
         </aside>
       </form>

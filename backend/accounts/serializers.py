@@ -17,6 +17,8 @@ def tokens_for(user):
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(source='__str__', read_only=True)
     is_platform_admin = serializers.BooleanField(read_only=True)
+    can_sell = serializers.BooleanField(read_only=True)
+    strikes = serializers.IntegerField(source='strikes.count', read_only=True)
 
     class Meta:
         model = User
@@ -24,8 +26,11 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'role',
             'phone', 'whatsapp', 'city', 'district', 'address', 'avatar', 'preferred_language',
             'is_verified', 'is_platform_admin', 'date_joined',
+            'can_sell', 'suspended_until', 'strikes',
+            'payout_method', 'payout_account_title', 'payout_account_number',
         )
-        read_only_fields = ('id', 'username', 'role', 'is_verified', 'is_platform_admin', 'date_joined')
+        read_only_fields = ('id', 'username', 'role', 'is_verified', 'is_platform_admin', 'date_joined',
+                            'suspended_until')
 
     def validate_email(self, value):
         qs = User.objects.filter(email__iexact=value)
@@ -115,6 +120,13 @@ class VerificationSerializer(serializers.ModelSerializer):
                   'status', 'status_display', 'rejection_reason', 'submitted_at', 'reviewed_at')
         read_only_fields = ('status', 'rejection_reason', 'submitted_at', 'reviewed_at')
         extra_kwargs = {'cnic_number': {'write_only': True}}
+
+    def validate_cnic_number(self, value):
+        from .penalties import is_cnic_banned
+
+        if is_cnic_banned(value):
+            raise serializers.ValidationError('This CNIC is banned from Kisan Mandi.')
+        return value
 
     def validate(self, attrs):
         for field in ('cnic_front', 'cnic_back'):

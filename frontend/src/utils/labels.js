@@ -41,11 +41,27 @@ export const BUSINESS_TYPES = {
 export const SEASONS = ['rabi', 'kharif', 'year_round']
 
 export const ORDER_STATUS_STYLES = {
+  awaiting_payment: 'bg-orange-100 text-orange-900',
   pending: 'bg-amber-100 text-amber-900',
   confirmed: 'bg-sky-100 text-sky-900',
   shipped: 'bg-violet-100 text-violet-900',
-  delivered: 'bg-brand-100 text-brand-900',
+  delivered: 'bg-teal-100 text-teal-900',
+  completed: 'bg-brand-100 text-brand-900',
+  disputed: 'bg-red-100 text-red-800',
+  refunded: 'bg-stone-200 text-stone-800',
   cancelled: 'bg-stone-200 text-stone-700',
+}
+
+/** Statuses in which the buyer's money is held by Kisan Mandi */
+export const HELD_STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'disputed']
+
+export const DISPUTE_REASONS = {
+  not_received: '📭',
+  not_as_described: '🔄',
+  damaged: '💔',
+  sick_animal: '🤒',
+  fake: '🚨',
+  other: '📝',
 }
 
 export const LISTING_STATUS_STYLES = {
@@ -54,10 +70,10 @@ export const LISTING_STATUS_STYLES = {
   rejected: 'bg-red-100 text-red-800',
 }
 
+// Online only – the platform must receive the money to protect the buyer.
 export const PAYMENT_METHODS = {
-  cod: '💵',
-  easypaisa: '📱',
   jazzcash: '📲',
+  easypaisa: '📱',
   bank_transfer: '🏦',
 }
 

@@ -12,6 +12,8 @@ import Home from './pages/Home'
 import Login from './pages/Login'
 import NotFound from './pages/NotFound'
 import Orders from './pages/Orders'
+import Pay from './pages/Pay'
+import PaymentResult from './pages/PaymentResult'
 import ProductDetail from './pages/ProductDetail'
 import Products from './pages/Products'
 import Register from './pages/Register'
@@ -21,6 +23,8 @@ import Verification from './pages/Verification'
 // Bigger, logged-in-only sections load on demand.
 const SellProduct = lazy(() => import('./pages/seller/SellProduct'))
 const MyListings = lazy(() => import('./pages/seller/MyListings'))
+const Earnings = lazy(() => import('./pages/seller/Earnings'))
+const Messages = lazy(() => import('./pages/Messages'))
 const TrackerDashboard = lazy(() => import('./pages/tracker/TrackerDashboard'))
 const BusinessDetail = lazy(() => import('./pages/tracker/BusinessDetail'))
 const Reports = lazy(() => import('./pages/tracker/Reports'))
@@ -53,12 +57,17 @@ export default function App() {
                   <Route path="account/verification" element={<Verification />} />
                   <Route path="cart" element={<Cart />} />
                   <Route path="checkout" element={<Checkout />} />
+                  <Route path="pay/:reference" element={<Pay />} />
+                  <Route path="payment/result" element={<PaymentResult />} />
                   <Route path="orders" element={<Orders key="buyer" as="buyer" />} />
                   <Route path="orders/received" element={<Orders key="seller" as="seller" />} />
+                  <Route path="messages" element={<Messages />} />
+                  <Route path="messages/:id" element={<Messages />} />
 
                   <Route path="sell" element={<SellProduct key="new" />} />
                   <Route path="my/listings" element={<MyListings />} />
                   <Route path="my/listings/:id/edit" element={<SellProduct key="edit" />} />
+                  <Route path="my/earnings" element={<Earnings />} />
 
                   <Route path="tracker" element={<TrackerDashboard />} />
                   <Route path="tracker/reports" element={<Reports />} />

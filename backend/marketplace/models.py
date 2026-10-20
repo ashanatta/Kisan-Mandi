@@ -4,6 +4,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models import Q
+from django.utils import timezone
 from django.utils.text import slugify
 
 
@@ -51,6 +53,20 @@ class Category(models.Model):
 
     def __str__(self):
         return f'{self.parent} › {self.name}' if self.parent else self.name
+
+
+def public_products_q(prefix=''):
+    """
+    Listings buyers may see: approved, not hidden, and from a CNIC-verified seller
+    who is not banned or suspended. `prefix` lets it filter through a relation.
+    """
+    p = prefix
+    now = timezone.now()
+    return (
+        Q(**{f'{p}status': 'approved', f'{p}is_active': True,
+             f'{p}seller__is_verified': True, f'{p}seller__is_banned': False})
+        & (Q(**{f'{p}seller__suspended_until__isnull': True}) | Q(**{f'{p}seller__suspended_until__lt': now}))
+    )
 
 
 class Product(models.Model):
@@ -175,7 +191,8 @@ class Product(models.Model):
 
     @property
     def is_available(self):
-        return self.status == self.Status.APPROVED and self.is_active and self.quantity > 0
+        in_stock = self.quantity > 0 or self.listing_type == self.ListingType.RENT
+        return self.status == self.Status.APPROVED and self.is_active and in_stock and self.seller.can_sell
 
     def __str__(self):
         return self.title

@@ -20,10 +20,14 @@ from django.db.models import Q
 from django.utils import timezone
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-from accounts.models import SellerVerification
+from accounts.models import BannedCNIC, SellerStrike, SellerVerification
+from chat.masking import mask_contact_details
+from chat.models import Conversation, Message
 from marketplace.models import Category, ListingReport, Product, ProductImage, SellerReview
 from orders import services as order_services
 from orders.models import CartItem, Order
+from payments.models import Dispute, Payment, Payout, Refund
+from payments.services import mark_paid
 from tracker.models import Business, Expense, Income
 
 User = get_user_model()
@@ -83,6 +87,7 @@ USERS = [
     ('kissan_store', 'Kissan Agro', 'Store', 'seller', 'Bahawalpur', 'Bahawalpur', '03001234505'),
     ('ali', 'Ali', 'Raza', 'buyer', 'Lahore', 'Lahore', '03001234506'),
     ('farhan', 'Farhan', 'Ahmed', 'buyer', 'Rahim Yar Khan', 'Rahim Yar Khan', '03001234507'),
+    ('bilal', 'Bilal', 'Hussain', 'seller', 'Vehari', 'Vehari', '03001234508'),
 ]
 
 # Image backgrounds per category kind: (top colour, bottom colour)
@@ -267,12 +272,14 @@ class Command(BaseCommand):
         users = self.seed_users()
         businesses = self.seed_tracker(users['aslam'])
         self.seed_products(users, categories, businesses)
+        self.seed_trust(users)
         self.seed_orders(users)
         self.seed_reviews(users)
-        self.seed_trust(users)
+        self.seed_chat(users)
         self.stdout.write(self.style.SUCCESS(
             f'Seeded {Category.objects.count()} categories, {Product.objects.count()} products, '
             f'{SellerReview.objects.count()} reviews, {Order.objects.count()} orders, '
+            f'{Dispute.objects.count()} disputes, {Payout.objects.count()} payouts, {Refund.objects.count()} refunds, '
             f'{Business.objects.count()} businesses, '
             f'{Expense.objects.count()} expenses, {Income.objects.count()} incomes.'
         ))
@@ -304,14 +311,24 @@ class Command(BaseCommand):
             user.first_name, user.last_name, user.role = first, last, role
             user.city, user.district, user.phone, user.whatsapp = city, district, phone, phone
             user.is_verified = False  # re-granted in seed_trust()
+            user.is_banned, user.suspended_until, user.is_active = False, None, True
+            if role == 'seller':
+                user.payout_method, user.payout_account_title, user.payout_account_number = 'jazzcash', f'{first} {last}', phone
             if created:
                 user.set_password(DEMO_PASSWORD)
             user.save()
             users[username] = user
 
         demo_users = list(users.values())
-        Order.objects.filter(Q(buyer__in=demo_users) | Q(seller__in=demo_users)).delete()
+        demo_orders = Order.objects.filter(Q(buyer__in=demo_users) | Q(seller__in=demo_users))
+        Refund.objects.filter(order__in=demo_orders).delete()
+        Payout.objects.filter(order__in=demo_orders).delete()
+        demo_orders.delete()
+        Payment.objects.filter(buyer__in=demo_users).delete()
         CartItem.objects.filter(user__in=demo_users).delete()
+        Conversation.objects.filter(Q(buyer__in=demo_users) | Q(seller__in=demo_users)).delete()
+        SellerStrike.objects.filter(seller__in=demo_users).delete()
+        BannedCNIC.objects.filter(user__in=demo_users).delete()
 
         demo_sellers = [u for u in users.values() if u.role == User.Role.SELLER]
         for image in ProductImage.objects.filter(product__seller__in=demo_sellers):
@@ -352,7 +369,10 @@ class Command(BaseCommand):
             Product.objects.filter(pk=product.pk).update(created_at=now - age, updated_at=now - age)
 
     def seed_orders(self, users):
-        """Run real checkouts and status changes so orders, stock and tracker income stay consistent."""
+        """
+        Real checkouts through the escrow flow (test gateway), so payments, held money,
+        payouts, refunds, disputes, stock and tracker income stay consistent.
+        """
         S = Order.Status
 
         def fill_cart(buyer, lines):
@@ -360,31 +380,52 @@ class Command(BaseCommand):
                 product = Product.objects.get(title__startswith=title)
                 CartItem.objects.create(user=buyer, product=product, quantity=Decimal(qty))
 
-        def shipping(user, address):
-            return dict(full_name=str(user), phone=user.phone, address=address, city=user.city,
-                        district=user.district, payment_method=Order.PaymentMethod.COD)
+        def buy(buyer, address, method='jazzcash'):
+            shipping = dict(full_name=str(buyer), phone=buyer.phone, address=address,
+                            city=buyer.city, district=buyer.district)
+            payment, orders = order_services.checkout(buyer, shipping, method)
+            mark_paid(payment, gateway='test', txn_id=f'TEST-{payment.reference}')
+            return {o.seller.username: o for o in orders}
 
         def age(orders, days):
             Order.objects.filter(pk__in=[o.pk for o in orders]).update(
                 created_at=timezone.now() - timedelta(days=days, hours=self.rng.randint(0, 8))
             )
 
-        ali, farhan = users['ali'], users['farhan']
+        def step(order, user, *statuses):
+            for status in statuses:
+                order = order_services.change_status(order, status, user)
+            return order
 
+        ali, farhan, aslam, kissan = users['ali'], users['farhan'], users['aslam'], users['kissan_store']
+
+        # Ali buys from three sellers. Wheat completes (money released to Aslam),
+        # DAP is confirmed, the cow is paid and waiting for Nadia.
         fill_cart(ali, [('Fresh Wheat', 20), ('DAP Fertilizer', 2), ('Sahiwal Cow', 1)])
-        orders = {o.seller.username: o for o in order_services.checkout(ali, shipping(ali, 'House 12, Block C, Model Town'))}
-        for step in (S.CONFIRMED, S.SHIPPED, S.DELIVERED):
-            order_services.change_status(orders['aslam'], step, users['aslam'])
-        order_services.change_status(orders['kissan_store'], S.CONFIRMED, users['kissan_store'])
+        orders = buy(ali, 'House 12, Block C, Model Town')
+        wheat = step(orders['aslam'], aslam, S.CONFIRMED, S.SHIPPED, S.DELIVERED)
+        step(wheat, ali, S.COMPLETED)  # buyer: "I received it - release the money"
+        step(orders['kissan_store'], kissan, S.CONFIRMED)
         age(orders.values(), 6)
 
+        # Farhan: hens + rotavator rent from Aslam, delivered, then a dispute about sick hens.
         fill_cart(farhan, [('Rotavator on Rent', 5), ('Desi Hens', 10)])
-        age(order_services.checkout(farhan, shipping(farhan, 'Chak 45, near Government School')), 1)
+        hens = buy(farhan, 'Chak 45, near Government School', method='easypaisa')['aslam']
+        hens = step(hens, aslam, S.CONFIRMED, S.SHIPPED, S.DELIVERED)
+        order_services.open_dispute(
+            hens, farhan, Dispute.Reason.SICK_ANIMAL,
+            '3 of the 10 hens were sick on arrival and one died the next day. The seller said they were healthy.',
+        )
+        order_services.respond_to_dispute(
+            hens, aslam, 'All hens were vaccinated and healthy when loaded. The trip was 6 hours in hot weather.',
+        )
+        age([hens], 2)
 
+        # Farhan: urea, paid then cancelled by the buyer -> full refund owed.
         fill_cart(farhan, [('Urea Fertilizer', 10)])
-        cancelled = order_services.checkout(farhan, shipping(farhan, 'Chak 45, near Government School'))
-        order_services.change_status(cancelled[0], S.CANCELLED, farhan, 'Bought locally instead')
-        age(cancelled, 3)
+        urea = buy(farhan, 'Chak 45, near Government School')['kissan_store']
+        order_services.change_status(urea, S.CANCELLED, farhan, note='Bought locally instead')
+        age([urea], 3)
 
         # Leave a couple of items in Ali's cart
         fill_cart(ali, [('Super Basmati', 5), ('Bt Cotton Seed', 2)])
@@ -404,14 +445,15 @@ class Command(BaseCommand):
         review.save()
 
     def seed_trust(self, users):
-        """Verified badges, one pending verification and one open listing report."""
-        for i, username in enumerate(('aslam', 'nadia', 'kissan_store'), start=1):
+        """Verified sellers (only they can sell), one pending verification and one open listing report."""
+        for i, username in enumerate(('aslam', 'tariq', 'rasool', 'nadia', 'kissan_store'), start=1):
             user = users[username]
             SellerVerification.objects.create(
                 user=user, cnic_number=f'35202-000000{i}-1', name_on_cnic=str(user)
             ).approve(None)
+            user.refresh_from_db()
         SellerVerification.objects.create(
-            user=users['tariq'], cnic_number='36302-0000004-1', name_on_cnic=str(users['tariq'])
+            user=users['bilal'], cnic_number='36302-0000009-1', name_on_cnic=str(users['bilal'])
         )
         ListingReport.objects.create(
             product=Product.objects.get(title__startswith='Massey Ferguson'),
@@ -419,6 +461,20 @@ class Command(BaseCommand):
             reason=ListingReport.Reason.WRONG_INFO,
             details='Seller told me on the phone that the price is higher than listed.',
         )
+
+    def seed_chat(self, users):
+        """Farhan asks Nadia about the buffalo; her phone number is hidden because he hasn't paid yet."""
+        farhan, nadia = users['farhan'], users['nadia']
+        conv = Conversation.objects.create(
+            product=Product.objects.get(title__startswith='Nili-Ravi Buffalo'), buyer=farhan, seller=nadia
+        )
+        for sender, text in [
+            (farhan, 'Assalam-o-Alaikum, is the buffalo still available? How many months pregnant is she?'),
+            (nadia, 'Walaikum Assalam. Yes available, 3 months pregnant. Call me on 0300-1234504 to visit.'),
+            (farhan, 'JazakAllah, I will order through Kisan Mandi so the payment is protected.'),
+        ]:
+            body, masked = mask_contact_details(text)
+            Message.objects.create(conversation=conv, sender=sender, body=body, was_masked=masked)
 
     def seed_tracker(self, owner):
         rng = self.rng

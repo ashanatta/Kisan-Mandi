@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next'
-import { HiOutlineShoppingCart, HiPlus } from 'react-icons/hi2'
-import { Link, NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { HiOutlineChatBubbleLeftRight, HiOutlineShoppingCart, HiPlus } from 'react-icons/hi2'
+import { Link, NavLink, useLocation } from 'react-router-dom'
+import api from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { useCart } from '../../context/CartContext'
 import LanguageToggle from '../LanguageToggle'
@@ -12,10 +14,33 @@ const LINKS = [
   { to: '/tracker', key: 'tracker' },
 ]
 
+/** Unread chat messages, refreshed every 30 s and on navigation. */
+function useUnreadMessages(enabled) {
+  const [count, setCount] = useState(0)
+  const { pathname } = useLocation()
+  useEffect(() => {
+    if (!enabled) return
+    let alive = true
+    const load = () =>
+      api
+        .get('/conversations/unread/')
+        .then(({ data }) => alive && setCount(data.unread))
+        .catch(() => {})
+    load()
+    const timer = setInterval(load, 30000)
+    return () => {
+      alive = false
+      clearInterval(timer)
+    }
+  }, [enabled, pathname])
+  return enabled ? count : 0
+}
+
 export default function Navbar() {
   const { t } = useTranslation()
   const { user } = useAuth()
   const { cart } = useCart()
+  const unread = useUnreadMessages(Boolean(user))
 
   return (
     <header className="sticky top-0 z-40 border-b border-brand-100/80 bg-cream/85 backdrop-blur-md">
@@ -41,6 +66,20 @@ export default function Navbar() {
 
         <div className="flex items-center gap-2">
           <LanguageToggle />
+          {user && (
+            <Link
+              to="/messages"
+              aria-label={t('chat.title')}
+              className="relative grid size-11 place-items-center rounded-full border-2 border-brand-200 bg-white text-brand-800 transition hover:border-brand-400"
+            >
+              <HiOutlineChatBubbleLeftRight className="size-5" />
+              {unread > 0 && (
+                <span className="latin absolute -end-1 -top-1 grid min-w-5 place-items-center rounded-full bg-red-500 px-1 text-xs font-extrabold text-white ring-2 ring-cream">
+                  {unread}
+                </span>
+              )}
+            </Link>
+          )}
           <Link
             to="/cart"
             aria-label={t('nav.cart')}
