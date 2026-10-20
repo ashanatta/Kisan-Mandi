@@ -15,6 +15,8 @@ import Orders from './pages/Orders'
 import ProductDetail from './pages/ProductDetail'
 import Products from './pages/Products'
 import Register from './pages/Register'
+import SellerProfile from './pages/SellerProfile'
+import Verification from './pages/Verification'
 
 // Bigger, logged-in-only sections load on demand.
 const SellProduct = lazy(() => import('./pages/seller/SellProduct'))
@@ -42,11 +44,13 @@ export default function App() {
                 <Route index element={<Home />} />
                 <Route path="products" element={<Products />} />
                 <Route path="products/:id" element={<ProductDetail />} />
+                <Route path="sellers/:id" element={<SellerProfile />} />
                 <Route path="login" element={<Login />} />
                 <Route path="register" element={<Register />} />
 
                 <Route element={<ProtectedRoute />}>
                   <Route path="account" element={<Account />} />
+                  <Route path="account/verification" element={<Verification />} />
                   <Route path="cart" element={<Cart />} />
                   <Route path="checkout" element={<Checkout />} />
                   <Route path="orders" element={<Orders key="buyer" as="buyer" />} />

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Category, Product, ProductImage, SellerReview
+from .models import Category, ListingReport, Product, ProductImage, SellerReview
 
 
 @admin.register(Category)
@@ -36,6 +36,30 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(SellerReview)
 class SellerReviewAdmin(admin.ModelAdmin):
-    list_display = ('seller', 'reviewer', 'rating', 'created_at')
+    list_display = ('seller', 'reviewer', 'rating', 'verified_purchase', 'created_at')
     list_filter = ('rating',)
     search_fields = ('seller__username', 'reviewer__username', 'comment')
+
+    @admin.display(boolean=True, description='Verified purchase')
+    def verified_purchase(self, obj):
+        return obj.order_id is not None
+
+
+@admin.register(ListingReport)
+class ListingReportAdmin(admin.ModelAdmin):
+    list_display = ('product', 'reason', 'reporter', 'status', 'created_at')
+    list_filter = ('status', 'reason')
+    search_fields = ('product__title', 'reporter__username', 'details')
+    list_select_related = ('product', 'reporter')
+    actions = ['hide_listing', 'dismiss']
+
+    @admin.action(description='🚫 Hide the reported listings and mark resolved')
+    def hide_listing(self, request, queryset):
+        Product.objects.filter(pk__in=queryset.values('product')).update(
+            status=Product.Status.REJECTED, rejection_reason='Removed after a user report.'
+        )
+        queryset.update(status=ListingReport.Status.RESOLVED)
+
+    @admin.action(description='Dismiss – the listing is fine')
+    def dismiss(self, request, queryset):
+        queryset.update(status=ListingReport.Status.DISMISSED)

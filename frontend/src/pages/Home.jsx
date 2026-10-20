@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { HiArrowRight, HiCheckCircle, HiOutlineMagnifyingGlass, HiOutlineSparkles } from 'react-icons/hi2'
+import { HiArrowRight, HiCheckBadge, HiCheckCircle, HiOutlineMagnifyingGlass, HiOutlineSparkles } from 'react-icons/hi2'
 import { Link, useNavigate } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
@@ -318,6 +318,39 @@ function HowItWorks() {
   )
 }
 
+function TrustSection() {
+  const { t } = useTranslation()
+  // Only claims the platform actually enforces.
+  const points = [
+    ['🛡️', 'trustPoint1', 'bg-sky-100'],
+    ['⭐', 'trustPoint2', 'bg-amber-100'],
+    ['✅', 'trustPoint3', 'bg-brand-100'],
+    ['🚩', 'trustPoint4', 'bg-red-100'],
+  ]
+  return (
+    <section className="container-page mt-20">
+      <div className="rounded-[2.5rem] border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-brand-50 p-6 sm:p-10">
+        <div className="max-w-2xl">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1 text-sm font-bold text-sky-900">
+            <HiCheckBadge className="size-4" /> {t('home.trustBadge')}
+          </span>
+          <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-brand-950 sm:text-4xl">{t('home.trustTitle')}</h2>
+          <p className="mt-3 text-lg text-stone-600">{t('home.trustText')}</p>
+        </div>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {points.map(([emoji, key, bg]) => (
+            <div key={key} className="card p-5">
+              <span className={`grid size-14 place-items-center rounded-2xl text-3xl ${bg}`}>{emoji}</span>
+              <h3 className="mt-4 font-extrabold text-brand-950">{t(`home.${key}Title`)}</h3>
+              <p className="mt-1 text-sm text-stone-600">{t(`home.${key}Text`)}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function SellCta() {
   const { t } = useTranslation()
   return (
@@ -375,6 +408,7 @@ export default function Home() {
 
       <TrackerPromo />
       <HowItWorks />
+      <TrustSection />
       <SellCta />
     </>
   )

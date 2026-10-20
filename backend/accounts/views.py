@@ -1,15 +1,21 @@
+from django.contrib.admin.views.decorators import staff_member_required
+from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import generics, serializers, status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
+from .models import SellerVerification
 from .serializers import (
     ChangePasswordSerializer,
     LoginSerializer,
     RegisterSerializer,
     UserSerializer,
+    VerificationSerializer,
     tokens_for,
 )
 
@@ -70,6 +76,51 @@ class BecomeSellerView(APIView):
             user.role = user.Role.SELLER
             user.save(update_fields=['role'])
         return Response(UserSerializer(user, context={'request': request}).data)
+
+
+class VerificationView(APIView):
+    """
+    The user's CNIC verification. `GET` returns its status (`none` if never submitted).
+    `POST` (multipart) submits CNIC number, name and front/back photos; allowed again after a rejection.
+    """
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    @extend_schema(responses=VerificationSerializer)
+    def get(self, request):
+        verification = SellerVerification.objects.filter(user=request.user).first()
+        if not verification:
+            return Response({'status': 'none'})
+        return Response(VerificationSerializer(verification).data)
+
+    @extend_schema(request=VerificationSerializer, responses={201: VerificationSerializer})
+    def post(self, request):
+        existing = SellerVerification.objects.filter(user=request.user).first()
+        if existing and existing.status != SellerVerification.Status.REJECTED:
+            return Response({'detail': 'Your verification is already submitted.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = VerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if existing:
+            # Replace the rejected attempt, removing its old photos.
+            existing.cnic_front.delete(save=False)
+            existing.cnic_back.delete(save=False)
+            existing.delete()
+        verification = serializer.save(user=request.user)
+        return Response(VerificationSerializer(verification).data, status=status.HTTP_201_CREATED)
+
+
+@staff_member_required
+def verification_photo(request, pk, side):
+    """Admin-only: stream a CNIC photo. These files are never served from /media/."""
+    verification = get_object_or_404(SellerVerification, pk=pk)
+    field = {'front': verification.cnic_front, 'back': verification.cnic_back}.get(side)
+    if not field:
+        raise Http404
+    response = FileResponse(field.open('rb'))
+    response['Cache-Control'] = 'private, no-store'
+    return response
 
 
 class ChangePasswordView(APIView):

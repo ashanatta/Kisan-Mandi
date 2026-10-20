@@ -17,6 +17,11 @@ import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { parseApiError } from '../utils/errors'
 import EmptyState from '../components/EmptyState'
+import ReportModal from '../components/trust/ReportModal'
+import ReviewList from '../components/trust/ReviewList'
+import ReviewModal from '../components/trust/ReviewModal'
+import SafetyTips from '../components/trust/SafetyTips'
+import VerifiedBadge from '../components/trust/VerifiedBadge'
 import ProductCard from '../components/ProductCard'
 import { PriceUnit } from '../components/ProductCard'
 import SectionHeader from '../components/SectionHeader'
@@ -73,6 +78,14 @@ function AddToCart({ product }) {
       <Link to={`/my/listings/${product.id}/edit`} className="btn-outline mt-4 w-full">
         ✏️ {t('product.yourListing')}
       </Link>
+    )
+  }
+
+  if (!isRent && max <= 0) {
+    return (
+      <button type="button" disabled className="btn mt-4 w-full bg-stone-200 text-stone-600">
+        {t('product.soldOut')}
+      </button>
     )
   }
 
@@ -163,7 +176,10 @@ function SellerCard({ seller, product }) {
           {initials}
         </span>
         <div className="min-w-0">
-          <p className="truncate text-lg font-extrabold text-brand-950">{seller.name}</p>
+          <Link to={`/sellers/${seller.id}`} className="flex items-center gap-1.5 hover:underline">
+            <span className="truncate text-lg font-extrabold text-brand-950">{seller.name}</span>
+            {seller.is_verified && <VerifiedBadge size="icon" />}
+          </Link>
           <div className="flex flex-wrap items-center gap-x-2 text-sm text-stone-500">
             {seller.rating ? (
               <>
@@ -178,6 +194,16 @@ function SellerCard({ seller, product }) {
           <p className="text-sm text-stone-500">
             {t('product.memberSince', { date: memberSince })} · {t('product.sellerListings', { count: seller.listings_count })}
           </p>
+        </div>
+      </div>
+
+      {/* Trust signals */}
+      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+        <div className={`rounded-2xl px-3 py-2 font-semibold ${seller.is_verified ? 'bg-sky-50 text-sky-900' : 'bg-stone-50 text-stone-500'}`}>
+          {seller.is_verified ? `🛡️ ${t('trust.cnicVerified')}` : `⏳ ${t('trust.notVerified')}`}
+        </div>
+        <div className="rounded-2xl bg-brand-50 px-3 py-2 font-semibold text-brand-900">
+          📦 <span className="latin">{seller.completed_orders}</span> {t('trust.completedOrders')}
         </div>
       </div>
 
@@ -198,41 +224,59 @@ function SellerCard({ seller, product }) {
         {seller.phone}
       </p>
       <Link
-        to={`/products?seller=${seller.id}`}
+        to={`/sellers/${seller.id}`}
         className="mt-3 flex items-center justify-center gap-1 text-sm font-semibold text-brand-700 hover:underline"
       >
-        {t('product.seeAllFromSeller')}
+        {t('trust.viewSellerProfile')}
         <HiChevronRight className="size-4 rtl:rotate-180" />
       </Link>
     </div>
   )
 }
 
-function Reviews({ sellerId }) {
-  const { t, i18n } = useTranslation()
-  const { data } = useApi(`/sellers/${sellerId}/reviews/`)
-  const reviews = data?.results ?? []
+function Reviews({ seller }) {
+  const { t } = useTranslation()
+  const { user } = useAuth()
+  const [writing, setWriting] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   return (
     <section className="card p-6">
-      <h2 className="text-xl font-extrabold text-brand-950">⭐ {t('product.reviews')}</h2>
-      {reviews.length === 0 ? (
-        <p className="mt-3 text-stone-500">{t('product.noReviews')}</p>
-      ) : (
-        <ul className="mt-4 divide-y divide-stone-100">
-          {reviews.map((r) => (
-            <li key={r.id} className="py-4 first:pt-0 last:pb-0">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-bold text-stone-800">{r.reviewer_name}</span>
-                <span className="text-xs text-stone-400">{timeAgo(r.created_at, i18n.resolvedLanguage)}</span>
-              </div>
-              <Stars value={r.rating} />
-              {r.comment && <p className="mt-1 text-stone-600">{r.comment}</p>}
-            </li>
-          ))}
-        </ul>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-xl font-extrabold text-brand-950">⭐ {t('product.reviews')}</h2>
+        {user && user.id !== seller.id && (
+          <button type="button" onClick={() => setWriting(true)} className="text-sm font-bold text-brand-700 hover:underline">
+            ✍️ {t('trust.writeReview')}
+          </button>
+        )}
+      </div>
+      <ReviewList sellerId={seller.id} refreshKey={refreshKey} />
+      {writing && (
+        <ReviewModal sellerId={seller.id} sellerName={seller.name} onClose={() => setWriting(false)} onSaved={() => setRefreshKey((k) => k + 1)} />
       )}
     </section>
+  )
+}
+
+function ReportButton({ product }) {
+  const { t } = useTranslation()
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [open, setOpen] = useState(false)
+  if (user?.id === product.seller.id) return null
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => (user ? setOpen(true) : navigate('/login', { state: { from: location } }))}
+        className="flex w-full items-center justify-center gap-1 text-sm font-semibold text-stone-500 hover:text-red-700"
+      >
+        🚩 {t('trust.reportListing')}
+      </button>
+      {open && <ReportModal productId={product.id} onClose={() => setOpen(false)} />}
+    </>
   )
 }
 
@@ -358,7 +402,9 @@ export default function ProductDetail() {
             <p className="mt-3 whitespace-pre-line leading-relaxed text-stone-700">{product.description}</p>
           </section>
 
-          <Reviews sellerId={product.seller.id} />
+          <Reviews seller={product.seller} />
+          <SafetyTips kind={product.category.kind} />
+          <ReportButton product={product} />
         </div>
       </div>
 

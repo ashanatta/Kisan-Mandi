@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { HiOutlineMapPin } from 'react-icons/hi2'
 import { Link } from 'react-router-dom'
 import { categoryName, formatPrice, kindStyle } from '../utils/format'
+import VerifiedBadge from './trust/VerifiedBadge'
 
 export function PriceUnit({ product, className = '' }) {
   const { t } = useTranslation()
@@ -36,6 +37,9 @@ export default function ProductCard({ product, compact = false }) {
           <div className={`grid size-full place-items-center text-6xl ${style.tile}`}>{style.emoji}</div>
         )}
         <div className="absolute start-3 top-3 flex flex-wrap gap-1.5">
+          {product.listing_type !== 'rent' && Number(product.quantity) <= 0 && (
+            <span className="rounded-full bg-stone-800/85 px-2.5 py-1 text-xs font-bold text-white shadow">{t('product.soldOut')}</span>
+          )}
           {product.listing_type === 'rent' && (
             <span className="rounded-full bg-amber-400 px-2.5 py-1 text-xs font-bold text-brand-950 shadow">
               {t('product.forRent')}
@@ -75,6 +79,7 @@ export default function ProductCard({ product, compact = false }) {
           <p className="mt-1 flex items-center gap-1 text-sm text-stone-500">
             <HiOutlineMapPin className="size-4 shrink-0" />
             <span className="truncate">{product.city}</span>
+            {product.seller_verified && <VerifiedBadge size="sm" className="ms-auto shrink-0" />}
           </p>
         </div>
       </div>

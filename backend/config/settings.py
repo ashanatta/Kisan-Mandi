@@ -177,6 +177,10 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Private uploads (CNIC photos) – never served by the media URL; admins view them
+# through an admin-only view.
+PRIVATE_MEDIA_ROOT = BASE_DIR / 'private_media'
+
 # Max upload size per request (10 MB)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 

@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Avg, Count
 from rest_framework import serializers
 
-from .models import Category, Product, ProductImage, SellerReview
+from .models import Category, ListingReport, Product, ProductImage, SellerReview
 
 MAX_IMAGES = 8
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -39,6 +39,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     category = CategoryBriefSerializer(read_only=True)
     primary_image = serializers.SerializerMethodField()
     seller_name = serializers.CharField(source='seller.__str__', read_only=True)
+    seller_verified = serializers.BooleanField(source='seller.is_verified', read_only=True)
     unit_display = serializers.CharField(source='get_unit_display', read_only=True)
     condition_display = serializers.CharField(source='get_condition_display', read_only=True)
     rent_period_display = serializers.CharField(source='get_rent_period_display', read_only=True)
@@ -48,7 +49,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'title', 'price', 'quantity', 'unit', 'unit_display',
             'condition', 'condition_display', 'listing_type', 'rent_period', 'rent_period_display',
-            'city', 'district', 'category', 'primary_image', 'seller_name',
+            'city', 'district', 'category', 'primary_image', 'seller_name', 'seller_verified',
             'breed', 'age_months', 'weight_kg', 'milk_liters_per_day',
             'created_at',
         )
@@ -62,7 +63,10 @@ class ProductListSerializer(serializers.ModelSerializer):
         url = images[0].image.url
         return request.build_absolute_uri(url) if request else url
 
+
 class SellerInfoSerializer(serializers.Serializer):
+    """Public seller info with the trust signals buyers look at."""
+
     id = serializers.IntegerField()
     name = serializers.CharField(source='__str__')
     phone = serializers.CharField()
@@ -70,9 +74,11 @@ class SellerInfoSerializer(serializers.Serializer):
     city = serializers.CharField()
     district = serializers.CharField()
     member_since = serializers.DateTimeField(source='date_joined')
+    is_verified = serializers.BooleanField()
     rating = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
     listings_count = serializers.SerializerMethodField()
+    completed_orders = serializers.SerializerMethodField()
 
     def _stats(self, user):
         if not hasattr(user, '_review_stats'):
@@ -88,6 +94,17 @@ class SellerInfoSerializer(serializers.Serializer):
 
     def get_listings_count(self, user) -> int:
         return user.products.filter(status=Product.Status.APPROVED, is_active=True).count()
+
+    def get_completed_orders(self, user) -> int:
+        return user.orders_received.filter(status='delivered').count()
+
+
+class SellerProfileSerializer(SellerInfoSerializer):
+    rating_breakdown = serializers.SerializerMethodField()
+
+    def get_rating_breakdown(self, user) -> dict[str, int]:
+        counts = dict(user.reviews_received.values_list('rating').annotate(n=Count('id')))
+        return {str(star): counts.get(star, 0) for star in range(5, 0, -1)}
 
 
 class ProductDetailSerializer(ProductListSerializer):
@@ -197,8 +214,23 @@ class ProductWriteSerializer(serializers.ModelSerializer):
 
 class SellerReviewSerializer(serializers.ModelSerializer):
     reviewer_name = serializers.CharField(source='reviewer.__str__', read_only=True)
+    verified_purchase = serializers.SerializerMethodField()
 
     class Meta:
         model = SellerReview
-        fields = ('id', 'seller', 'reviewer_name', 'rating', 'comment', 'created_at')
-        read_only_fields = ('seller',)
+        fields = ('id', 'seller', 'reviewer_name', 'rating', 'comment', 'verified_purchase',
+                  'seller_reply', 'replied_at', 'created_at', 'updated_at')
+        read_only_fields = ('seller', 'seller_reply', 'replied_at')
+
+    def get_verified_purchase(self, review) -> bool:
+        return review.order_id is not None
+
+
+class ReviewReplySerializer(serializers.Serializer):
+    reply = serializers.CharField(max_length=1000, allow_blank=True)
+
+
+class ListingReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ListingReport
+        fields = ('reason', 'details')

@@ -4,6 +4,8 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from .models import SellerVerification
+
 User = get_user_model()
 
 
@@ -21,9 +23,9 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'role',
             'phone', 'whatsapp', 'city', 'district', 'address', 'avatar', 'preferred_language',
-            'is_platform_admin', 'date_joined',
+            'is_verified', 'is_platform_admin', 'date_joined',
         )
-        read_only_fields = ('id', 'username', 'role', 'is_platform_admin', 'date_joined')
+        read_only_fields = ('id', 'username', 'role', 'is_verified', 'is_platform_admin', 'date_joined')
 
     def validate_email(self, value):
         qs = User.objects.filter(email__iexact=value)
@@ -94,6 +96,31 @@ class LoginSerializer(TokenObtainPairSerializer):
         data = super().validate(attrs)
         data['user'] = UserSerializer(self.user, context=self.context).data
         return data
+
+
+MAX_CNIC_PHOTO_BYTES = 5 * 1024 * 1024
+
+
+class VerificationSerializer(serializers.ModelSerializer):
+    """Submit CNIC details. Photos are write-only: they are never sent back to the browser."""
+
+    cnic_front = serializers.ImageField(write_only=True)
+    cnic_back = serializers.ImageField(write_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    masked_cnic = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = SellerVerification
+        fields = ('cnic_number', 'name_on_cnic', 'cnic_front', 'cnic_back', 'masked_cnic',
+                  'status', 'status_display', 'rejection_reason', 'submitted_at', 'reviewed_at')
+        read_only_fields = ('status', 'rejection_reason', 'submitted_at', 'reviewed_at')
+        extra_kwargs = {'cnic_number': {'write_only': True}}
+
+    def validate(self, attrs):
+        for field in ('cnic_front', 'cnic_back'):
+            if attrs[field].size > MAX_CNIC_PHOTO_BYTES:
+                raise serializers.ValidationError({field: 'Photo must be smaller than 5 MB.'})
+        return attrs
 
 
 class ChangePasswordSerializer(serializers.Serializer):

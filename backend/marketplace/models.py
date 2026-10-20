@@ -204,8 +204,12 @@ class SellerReview(models.Model):
     reviewer = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reviews_given'
     )
+    # The delivered order the review is based on ("verified purchase").
+    order = models.ForeignKey('orders.Order', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     rating = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)])
     comment = models.TextField(blank=True)
+    seller_reply = models.TextField(blank=True)
+    replied_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -220,3 +224,36 @@ class SellerReview(models.Model):
 
     def __str__(self):
         return f'{self.reviewer} → {self.seller}: {self.rating}★'
+
+
+class ListingReport(models.Model):
+    """A user flags a listing as suspicious; admins review the queue."""
+
+    class Reason(models.TextChoices):
+        FRAUD = 'fraud', 'Fraud / scam'
+        FAKE_PHOTOS = 'fake_photos', 'Fake or copied photos'
+        WRONG_INFO = 'wrong_info', 'Wrong price or details'
+        SOLD = 'sold', 'Already sold'
+        PROHIBITED = 'prohibited', 'Banned or illegal item'
+        OTHER = 'other', 'Other'
+
+    class Status(models.TextChoices):
+        OPEN = 'open', 'Open'
+        RESOLVED = 'resolved', 'Action taken'
+        DISMISSED = 'dismissed', 'Dismissed'
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reports')
+    reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reports_made')
+    reason = models.CharField(max_length=15, choices=Reason.choices)
+    details = models.TextField(blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.OPEN)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['product', 'reporter'], name='one_report_per_user_per_listing'),
+        ]
+
+    def __str__(self):
+        return f'{self.get_reason_display()} – {self.product}'

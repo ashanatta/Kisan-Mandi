@@ -8,6 +8,7 @@ import { parseApiError } from '../utils/errors'
 import { formatNumber, formatPrice, timeAgo, toWhatsAppNumber } from '../utils/format'
 import { PAYMENT_METHODS } from '../utils/labels'
 import StatusBadge from './StatusBadge'
+import ReviewModal from './trust/ReviewModal'
 
 const STEPS = ['pending', 'confirmed', 'shipped', 'delivered']
 const ACTION_STYLES = {
@@ -44,6 +45,7 @@ export default function OrderCard({ order, as = 'buyer', onChange, defaultOpen =
   const lang = i18n.resolvedLanguage
   const [open, setOpen] = useState(defaultOpen)
   const [busy, setBusy] = useState(false)
+  const [reviewing, setReviewing] = useState(false)
   const party = as === 'seller' ? order.buyer : order.seller
 
   const act = async (status) => {
@@ -151,6 +153,12 @@ export default function OrderCard({ order, as = 'buyer', onChange, defaultOpen =
                 ))}
             </div>
           )}
+          {as === 'buyer' && order.status === 'delivered' && (
+            <button type="button" onClick={() => setReviewing(true)} className="btn-accent w-full sm:w-auto">
+              ⭐ {t('trust.rateSellerShort')}
+            </button>
+          )}
+          {reviewing && <ReviewModal sellerId={order.seller.id} sellerName={order.seller.name} onClose={() => setReviewing(false)} />}
           {as === 'seller' && order.status === 'shipped' && (
             <p className="text-sm text-stone-500">📊 {t('orders.trackerNote')}</p>
           )}

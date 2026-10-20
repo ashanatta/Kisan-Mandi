@@ -6,19 +6,23 @@ from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import generics, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import AllowAny
+from django.utils import timezone
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .filters import ProductFilter
-from .models import Category, Product, SellerReview
+from .models import Category, ListingReport, Product, SellerReview
 from .permissions import IsSeller
 from .serializers import (
     CategorySerializer,
+    ListingReportSerializer,
     ProductDetailSerializer,
     ProductListSerializer,
     ProductWriteSerializer,
+    ReviewReplySerializer,
     SellerProductSerializer,
+    SellerProfileSerializer,
     SellerReviewSerializer,
 )
 
@@ -195,15 +199,115 @@ class MyProductViewSet(viewsets.ModelViewSet):
         })
 
 
-class SellerReviewListView(generics.ListAPIView):
-    """Reviews received by a seller."""
+def _sellers():
+    return User.objects.filter(Q(role=User.Role.SELLER) | Q(role=User.Role.ADMIN), is_active=True)
+
+
+def _delivered_order(buyer, seller_id):
+    from orders.models import Order
+
+    return (
+        Order.objects.filter(buyer=buyer, seller_id=seller_id, status=Order.Status.DELIVERED)
+        .order_by('-updated_at')
+        .first()
+    )
+
+
+class SellerProfileView(generics.RetrieveAPIView):
+    """Public seller profile: verification, rating breakdown, completed orders."""
+
+    serializer_class = SellerProfileSerializer
+    permission_classes = [AllowAny]
+    lookup_url_kwarg = 'seller_id'
+
+    def get_queryset(self):
+        return _sellers()
+
+
+class SellerReviewListView(generics.ListCreateAPIView):
+    """
+    Reviews received by a seller. `POST` adds or updates your review – only allowed
+    after one of your orders from this seller has been delivered (verified purchase).
+    """
 
     serializer_class = SellerReviewSerializer
-    permission_classes = [AllowAny]
     queryset = SellerReview.objects.none()  # for the API schema
+
+    def get_permissions(self):
+        return [IsAuthenticated()] if self.request.method == 'POST' else [AllowAny()]
 
     def get_queryset(self):
         return SellerReview.objects.filter(seller_id=self.kwargs['seller_id']).select_related('reviewer')
+
+    def create(self, request, *args, **kwargs):
+        seller = get_object_or_404(_sellers(), pk=self.kwargs['seller_id'])
+        if seller == request.user:
+            return Response({'detail': 'You cannot review yourself.'}, status=status.HTTP_400_BAD_REQUEST)
+        order = _delivered_order(request.user, seller.pk)
+        if not order:
+            return Response(
+                {'detail': 'You can review a seller after one of your orders from them is delivered.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        review, created = SellerReview.objects.update_or_create(
+            seller=seller, reviewer=request.user,
+            defaults={'order': order, **serializer.validated_data},
+        )
+        return Response(self.get_serializer(review).data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class MyReviewOfSellerView(APIView):
+    """Whether the user can review this seller, and their existing review if any."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=inline_serializer('ReviewEligibility', {
+        'can_review': serializers.BooleanField(),
+        'review': SellerReviewSerializer(allow_null=True),
+    }))
+    def get(self, request, seller_id):
+        review = SellerReview.objects.filter(seller_id=seller_id, reviewer=request.user).first()
+        can_review = seller_id != request.user.id and _delivered_order(request.user, seller_id) is not None
+        return Response({
+            'can_review': can_review,
+            'review': SellerReviewSerializer(review).data if review else None,
+        })
+
+
+class ReviewReplyView(APIView):
+    """A seller replies publicly to a review they received. Send an empty reply to remove it."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(request=ReviewReplySerializer, responses=SellerReviewSerializer)
+    def post(self, request, review_id):
+        review = get_object_or_404(SellerReview, pk=review_id, seller=request.user)
+        serializer = ReviewReplySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        review.seller_reply = serializer.validated_data['reply'].strip()
+        review.replied_at = timezone.now() if review.seller_reply else None
+        review.save(update_fields=['seller_reply', 'replied_at'])
+        return Response(SellerReviewSerializer(review).data)
+
+
+class ReportListingView(APIView):
+    """Report a suspicious listing. Each user can report a listing once."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(request=ListingReportSerializer, responses={201: None})
+    def post(self, request, pk):
+        product = get_object_or_404(Product.objects.filter(PUBLIC_PRODUCTS), pk=pk)
+        if product.seller_id == request.user.id:
+            return Response({'detail': 'You cannot report your own listing.'}, status=status.HTTP_400_BAD_REQUEST)
+        if ListingReport.objects.filter(product=product, reporter=request.user).exists():
+            return Response({'detail': 'You have already reported this listing.'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = ListingReportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(product=product, reporter=request.user)
+        return Response(status=status.HTTP_201_CREATED)
 
 
 class StatsView(APIView):

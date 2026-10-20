@@ -20,10 +20,14 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+from accounts.views import verification_photo
+
 admin.site.site_header = 'Agri Shop Admin'
 admin.site.site_title = 'Agri Shop Admin'
 
 urlpatterns = [
+    # Admin-only CNIC photo viewer (must come before the admin catch-all)
+    path('admin/verification/<int:pk>/<str:side>/', verification_photo, name='verification-photo'),
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
     path('api/tracker/', include('tracker.urls')),

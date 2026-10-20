@@ -20,7 +20,8 @@ from django.db.models import Q
 from django.utils import timezone
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-from marketplace.models import Category, Product, ProductImage, SellerReview
+from accounts.models import SellerVerification
+from marketplace.models import Category, ListingReport, Product, ProductImage, SellerReview
 from orders import services as order_services
 from orders.models import CartItem, Order
 from tracker.models import Business, Expense, Income
@@ -266,8 +267,9 @@ class Command(BaseCommand):
         users = self.seed_users()
         businesses = self.seed_tracker(users['aslam'])
         self.seed_products(users, categories, businesses)
-        self.seed_reviews(users)
         self.seed_orders(users)
+        self.seed_reviews(users)
+        self.seed_trust(users)
         self.stdout.write(self.style.SUCCESS(
             f'Seeded {Category.objects.count()} categories, {Product.objects.count()} products, '
             f'{SellerReview.objects.count()} reviews, {Order.objects.count()} orders, '
@@ -301,6 +303,7 @@ class Command(BaseCommand):
             )
             user.first_name, user.last_name, user.role = first, last, role
             user.city, user.district, user.phone, user.whatsapp = city, district, phone, phone
+            user.is_verified = False  # re-granted in seed_trust()
             if created:
                 user.set_password(DEMO_PASSWORD)
             user.save()
@@ -315,6 +318,7 @@ class Command(BaseCommand):
             image.image.delete(save=False)
         Product.objects.filter(seller__in=demo_sellers).delete()
         SellerReview.objects.filter(seller__in=users.values()).delete()
+        SellerVerification.objects.filter(user__in=demo_users).delete()
         Business.objects.filter(owner__in=users.values()).delete()
         return users
 
@@ -387,9 +391,34 @@ class Command(BaseCommand):
 
     def seed_reviews(self, users):
         for reviewer, seller, rating, comment in REVIEWS:
+            # Linked to a delivered order when one exists → shown as "verified purchase"
+            order = Order.objects.filter(
+                buyer=users[reviewer], seller=users[seller], status=Order.Status.DELIVERED
+            ).first()
             SellerReview.objects.create(
-                reviewer=users[reviewer], seller=users[seller], rating=rating, comment=comment
+                reviewer=users[reviewer], seller=users[seller], rating=rating, comment=comment, order=order
             )
+        review = SellerReview.objects.get(reviewer=users['ali'], seller=users['nadia'])
+        review.seller_reply = 'JazakAllah! Her calf is also available next month, call me anytime.'
+        review.replied_at = timezone.now()
+        review.save()
+
+    def seed_trust(self, users):
+        """Verified badges, one pending verification and one open listing report."""
+        for i, username in enumerate(('aslam', 'nadia', 'kissan_store'), start=1):
+            user = users[username]
+            SellerVerification.objects.create(
+                user=user, cnic_number=f'35202-000000{i}-1', name_on_cnic=str(user)
+            ).approve(None)
+        SellerVerification.objects.create(
+            user=users['tariq'], cnic_number='36302-0000004-1', name_on_cnic=str(users['tariq'])
+        )
+        ListingReport.objects.create(
+            product=Product.objects.get(title__startswith='Massey Ferguson'),
+            reporter=users['farhan'],
+            reason=ListingReport.Reason.WRONG_INFO,
+            details='Seller told me on the phone that the price is higher than listed.',
+        )
 
     def seed_tracker(self, owner):
         rng = self.rng

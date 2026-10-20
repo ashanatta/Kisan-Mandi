@@ -5,6 +5,7 @@ import { HiArrowRightOnRectangle, HiChevronRight, HiOutlineMapPin } from 'react-
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../api/client'
 import FormField from '../components/FormField'
+import VerifiedBadge from '../components/trust/VerifiedBadge'
 import { useAuth } from '../context/AuthContext'
 import { parseApiError } from '../utils/errors'
 
@@ -209,6 +210,29 @@ export default function Account() {
           </Link>
         ))}
       </section>
+
+      {user.role !== 'buyer' && (
+        <Link
+          to="/account/verification"
+          className={`card flex items-center gap-4 p-5 transition hover:-translate-y-0.5 ${user.is_verified ? 'border-sky-200 bg-sky-50' : 'border-amber-200 bg-amber-50'}`}
+        >
+          <span className="text-4xl">{user.is_verified ? '🛡️' : '🪪'}</span>
+          <div className="flex-1">
+            <p className="flex flex-wrap items-center gap-2 font-extrabold text-brand-950">
+              {user.is_verified ? t('trust.youAreVerified') : t('trust.getVerified')}
+              {user.is_verified && <VerifiedBadge size="sm" />}
+            </p>
+            <p className="text-sm text-stone-600">{user.is_verified ? t('trust.youAreVerifiedText') : t('trust.getVerifiedCta')}</p>
+          </div>
+          <HiChevronRight className="size-5 text-stone-400 rtl:rotate-180" />
+        </Link>
+      )}
+
+      {user.role !== 'buyer' && (
+        <Link to={`/sellers/${user.id}`} className="block text-center text-sm font-bold text-brand-700 hover:underline">
+          👀 {t('trust.viewMyProfile')}
+        </Link>
+      )}
 
       {user.is_platform_admin && (
         <section className="card flex flex-wrap items-center gap-4 border-violet-200 bg-violet-50 p-5">
