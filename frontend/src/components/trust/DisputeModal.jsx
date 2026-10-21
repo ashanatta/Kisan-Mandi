@@ -48,8 +48,10 @@ export default function DisputeModal({ order, mode = 'open', onClose, onSaved })
         {opening && (
           <>
             <p className="rounded-2xl bg-brand-50 px-4 py-3 text-sm text-brand-900">🔒 {t('dispute.moneySafe')}</p>
+            {order.delivery_verified && <p className="text-sm text-stone-600">🔑 {t('delivery.notReceivedBlocked')}</p>}
             <div className="grid gap-2 sm:grid-cols-2">
-              {Object.entries(DISPUTE_REASONS).map(([key, emoji]) => (
+              {/* The buyer's delivery code proves receipt, so "not received" no longer applies. */}
+              {Object.entries(DISPUTE_REASONS).filter(([key]) => !(order.delivery_verified && key === 'not_received')).map(([key, emoji]) => (
                 <label
                   key={key}
                   className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border-2 px-4 transition ${

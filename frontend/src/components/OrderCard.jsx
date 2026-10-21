@@ -10,6 +10,7 @@ import { parseApiError } from '../utils/errors'
 import { formatNumber, formatPrice, timeAgo, toWhatsAppNumber } from '../utils/format'
 import { DISPUTE_REASONS, HELD_STATUSES, PAYMENT_METHODS } from '../utils/labels'
 import StatusBadge from './StatusBadge'
+import DeliverModal from './trust/DeliverModal'
 import DisputeModal from './trust/DisputeModal'
 import ReviewModal from './trust/ReviewModal'
 import VerifiedBadge from './trust/VerifiedBadge'
@@ -96,6 +97,40 @@ function EscrowPanel({ order, as }) {
   return null
 }
 
+/** Buyer: the secret delivery code. Both sides: how the delivery was proven. */
+function DeliveryPanel({ order }) {
+  const { t } = useTranslation()
+  if (order.delivery_code) {
+    return (
+      <div className="flex flex-wrap items-center gap-4 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 px-4 py-3">
+        <div className="text-center">
+          <p className="text-xs font-bold text-amber-800">🔑 {t('delivery.codeTitle')}</p>
+          <p className="latin text-3xl font-extrabold tracking-[0.3em] text-amber-950" dir="ltr">{order.delivery_code}</p>
+        </div>
+        <div className="min-w-0 flex-1 text-sm text-amber-900">
+          <p className="font-semibold">{t('delivery.codeHint')}</p>
+          <p className="mt-1">{t('delivery.codeWarning')}</p>
+        </div>
+      </div>
+    )
+  }
+  if (!order.delivered_at) return null
+  const tracking = [order.courier_name, order.tracking_number].filter(Boolean).join(' · ')
+  return (
+    <div className={`flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3 text-sm ${order.delivery_verified ? 'bg-brand-50 text-brand-900' : 'bg-amber-50 text-amber-900'}`}>
+      <p className="flex-1 font-semibold">
+        {order.delivery_verified ? `✅ ${t('delivery.verified')}` : `📷 ${t('delivery.unverified')}`}
+        {tracking && <span className="latin block font-normal" dir="ltr">🚚 {tracking}</span>}
+      </p>
+      {order.delivery_proof && (
+        <a href={order.delivery_proof} target="_blank" rel="noreferrer" className="flex items-center gap-2 font-bold underline">
+          <img src={order.delivery_proof} alt="" className="size-12 rounded-xl object-cover" /> {t('delivery.viewProof')}
+        </a>
+      )}
+    </div>
+  )
+}
+
 function DisputePanel({ order, as, onRespond }) {
   const { t } = useTranslation()
   const d = order.dispute
@@ -147,10 +182,14 @@ export default function OrderCard({ order, as = 'buyer', onChange, defaultOpen =
   const lang = i18n.resolvedLanguage
   const [open, setOpen] = useState(defaultOpen)
   const [busy, setBusy] = useState(false)
-  const [modal, setModal] = useState(null) // 'review' | 'dispute' | 'respond'
+  const [modal, setModal] = useState(null) // 'review' | 'dispute' | 'respond' | 'deliver'
   const party = as === 'seller' ? order.buyer : order.seller
 
   const act = async (status) => {
+    if (status === 'delivered') {
+      setModal('deliver')
+      return
+    }
     let note = ''
     if (status === 'cancelled') {
       const reason = window.prompt(t('orders.cancelReason'))
@@ -198,6 +237,7 @@ export default function OrderCard({ order, as = 'buyer', onChange, defaultOpen =
         <div className="space-y-5 border-t border-stone-100 p-4 sm:p-5">
           <Progress status={order.status} />
           <EscrowPanel order={order} as={as} />
+          <DeliveryPanel order={order} />
 
           {['cancelled', 'refunded'].includes(order.status) && (
             <p className="rounded-2xl bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-700">
@@ -285,6 +325,7 @@ export default function OrderCard({ order, as = 'buyer', onChange, defaultOpen =
         </div>
       )}
 
+      {modal === 'deliver' && <DeliverModal order={order} onClose={() => setModal(null)} onSaved={onChange} />}
       {modal === 'review' && <ReviewModal sellerId={order.seller.id} sellerName={order.seller.name} onClose={() => setModal(null)} />}
       {(modal === 'dispute' || modal === 'respond') && (
         <DisputeModal order={order} mode={modal === 'dispute' ? 'open' : 'respond'} onClose={() => setModal(null)} onSaved={onChange} />

@@ -234,6 +234,9 @@ SPECTACULAR_SETTINGS = {
 
 FRONTEND_URL = config('FRONTEND_URL', default='http://127.0.0.1:5173')
 PROTECTION_DAYS = config('PROTECTION_DAYS', default=3, cast=int)
+# Longer window when the seller delivered without the buyer's delivery code
+UNVERIFIED_PROTECTION_DAYS = config('UNVERIFIED_PROTECTION_DAYS', default=7, cast=int)
+MAX_DELIVERY_CODE_ATTEMPTS = config('MAX_DELIVERY_CODE_ATTEMPTS', default=5, cast=int)
 PAYMENT_EXPIRY_MINUTES = config('PAYMENT_EXPIRY_MINUTES', default=30, cast=int)
 SELLER_RESPONSE_HOURS = config('SELLER_RESPONSE_HOURS', default=48, cast=int)
 PLATFORM_COMMISSION_PERCENT = config('PLATFORM_COMMISSION_PERCENT', default='0')

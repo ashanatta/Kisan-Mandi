@@ -33,6 +33,7 @@ class PaymentMethodsView(APIView):
         return Response({
             'methods': gateways.available_methods(),
             'protection_days': settings.PROTECTION_DAYS,
+            'unverified_protection_days': settings.UNVERIFIED_PROTECTION_DAYS,
             'payment_expiry_minutes': settings.PAYMENT_EXPIRY_MINUTES,
             'commission_percent': Decimal(str(settings.PLATFORM_COMMISSION_PERCENT)),
         })

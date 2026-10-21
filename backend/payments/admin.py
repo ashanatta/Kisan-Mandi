@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.html import format_html
 
+from orders.admin import delivery_proof_html
 from orders.services import resolve_dispute
 
 from .models import Dispute, DisputeEvidence, Payment, Payout, Refund
@@ -143,10 +144,12 @@ class DisputeAdmin(admin.ModelAdmin):
     list_filter = ('status', 'reason', 'decision')
     search_fields = ('order__order_number', 'order__seller__username', 'order__buyer__username')
     readonly_fields = ('order', 'order_total', 'buyer', 'seller', 'seller_strikes', 'reason', 'description',
-                       'seller_response', 'respond_by', 'status', 'resolved_at', 'resolved_by')
+                       'seller_response', 'respond_by', 'status', 'resolved_at', 'resolved_by',
+                       'delivery_check', 'tracking', 'delivery_proof')
     fieldsets = (
         ('Case', {'fields': ('order', 'order_total', 'buyer', 'seller', 'seller_strikes', 'reason', 'description',
                              'seller_response', 'respond_by', 'status')}),
+        ('Proof of delivery', {'fields': ('delivery_check', 'tracking', 'delivery_proof')}),
         ('Decision – the money moves when you save', {'fields': ('decision', 'refund_amount', 'resolution_note',
                                                                 'resolved_at', 'resolved_by')}),
     )
@@ -165,6 +168,24 @@ class DisputeAdmin(admin.ModelAdmin):
     @admin.display(description='Seller strikes so far')
     def seller_strikes(self, obj):
         return obj.order.seller.strikes.count()
+
+    @admin.display(description='Delivery')
+    def delivery_check(self, obj):
+        order = obj.order
+        if order.delivery_verified:
+            return "✅ Confirmed with the buyer's delivery code – the buyer had the goods in hand"
+        if order.delivered_at:
+            return '⚠️ Marked delivered WITHOUT the code – check the photo and tracking below'
+        return '❌ Never marked delivered by the seller'
+
+    @admin.display(description='Courier / tracking')
+    def tracking(self, obj):
+        order = obj.order
+        return ' '.join(filter(None, [order.courier_name, order.tracking_number])) or '—'
+
+    @admin.display(description='Proof photo')
+    def delivery_proof(self, obj):
+        return delivery_proof_html(obj.order)
 
     @admin.display(boolean=True, description='Seller replied')
     def seller_responded(self, obj):

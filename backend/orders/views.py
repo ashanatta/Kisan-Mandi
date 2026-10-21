@@ -15,6 +15,7 @@ from .models import CartItem, Order, OrderItem
 from .serializers import (
     CartItemSerializer,
     CheckoutSerializer,
+    DeliverSerializer,
     DisputeOpenSerializer,
     DisputeRespondSerializer,
     OrderSerializer,
@@ -165,6 +166,19 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
         data = serializer.validated_data
         order = self.get_object()
         services.respond_to_dispute(order, request.user, data.get('response', ''), data.get('images', []))
+        return Response(self.get_serializer(self.get_queryset().get(pk=order.pk)).data)
+
+    @extend_schema(request={'multipart/form-data': DeliverSerializer}, responses=OrderSerializer)
+    @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser])
+    def deliver(self, request, pk=None):
+        """Seller marks the order delivered with the buyer's code, or with a proof photo."""
+        serializer = DeliverSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        order = services.mark_delivered(
+            self.get_object(), request.user, code=data.get('code', ''), proof=data.get('proof'),
+            courier_name=data.get('courier_name', ''), tracking_number=data.get('tracking_number', ''),
+        )
         return Response(self.get_serializer(self.get_queryset().get(pk=order.pk)).data)
 
     @extend_schema(request=StatusUpdateSerializer, responses=OrderSerializer)
