@@ -185,10 +185,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # through an admin-only view.
 PRIVATE_MEDIA_ROOT = BASE_DIR / 'private_media'
 
-# Max upload size per request (10 MB)
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
-
-
 # Django REST Framework
 
 REST_FRAMEWORK = {
@@ -280,6 +276,11 @@ COMMUNITY_MAX_VIDEO_MB = config('COMMUNITY_MAX_VIDEO_MB', default=50, cast=int)
 COMMUNITY_POSTS_PER_DAY = config('COMMUNITY_POSTS_PER_DAY', default=10, cast=int)
 # A post is hidden for admin review once this many different users report it
 COMMUNITY_REPORTS_TO_HIDE = config('COMMUNITY_REPORTS_TO_HIDE', default=3, cast=int)
+# A post can contain up to six media files, each up to the configured video
+# limit. Keep Django's request-body guard above that combined size so valid
+# community uploads reach the per-file validation in the serializer.
+COMMUNITY_MAX_FILES = 6
+DATA_UPLOAD_MAX_MEMORY_SIZE = (COMMUNITY_MAX_VIDEO_MB * COMMUNITY_MAX_FILES + 1) * 1024 * 1024
 
 
 # CORS (React dev server)
