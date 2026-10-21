@@ -28,6 +28,7 @@ const Messages = lazy(() => import('./pages/Messages'))
 const TrackerDashboard = lazy(() => import('./pages/tracker/TrackerDashboard'))
 const BusinessDetail = lazy(() => import('./pages/tracker/BusinessDetail'))
 const Reports = lazy(() => import('./pages/tracker/Reports'))
+const Forecast = lazy(() => import('./pages/tracker/Forecast'))
 
 function PageSpinner() {
   return (
@@ -71,6 +72,7 @@ export default function App() {
 
                   <Route path="tracker" element={<TrackerDashboard />} />
                   <Route path="tracker/reports" element={<Reports />} />
+                  <Route path="tracker/forecast" element={<Forecast />} />
                   <Route path="tracker/:id" element={<BusinessDetail />} />
                 </Route>
 

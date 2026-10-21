@@ -149,6 +149,9 @@ export default function BusinessDetail() {
           )}
         </div>
         <div className="flex gap-2">
+          <Link to={`/tracker/forecast?business=${id}`} className="btn-ghost min-h-11 px-3" title={t('forecast.title')}>
+            🔮 <span className="hidden sm:inline">{t('forecast.short')}</span>
+          </Link>
           <Link to={`/tracker/reports?business=${id}`} className="btn-ghost min-h-11 px-3" title={t('tracker.reports')}>
             <HiOutlineDocumentChartBar className="size-5" />
           </Link>
