@@ -20,11 +20,11 @@ PATTERNS = [
 ]
 
 
-def mask_contact_details(text):
+def mask_contact_details(text, hidden=HIDDEN):
     """Returns (masked_text, was_masked)."""
     # Links/emails first: a wa.me link contains a phone number and must be removed whole.
     masked = text
     for pattern in PATTERNS:
-        masked = pattern.sub(HIDDEN, masked)
-    masked = PHONE.sub(lambda m: HIDDEN if sum(c.isdigit() for c in m.group()) >= 10 else m.group(), masked)
+        masked = pattern.sub(hidden, masked)
+    masked = PHONE.sub(lambda m: hidden if sum(c.isdigit() for c in m.group()) >= 10 else m.group(), masked)
     return masked, masked != text

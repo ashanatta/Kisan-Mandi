@@ -20,6 +20,7 @@ export default function Footer() {
       title: t('footer.tools'),
       links: [
         ['/tracker', '📊 ' + t('nav.tracker')],
+        ['/community', '👨‍🌾 ' + t('nav.community')],
         ['/cart', '🛒 ' + t('nav.cart')],
       ],
     },

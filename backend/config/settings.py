@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'payments',
     'chat',
     'insights',
+    'community',
 ]
 
 MIDDLEWARE = [
@@ -271,6 +272,14 @@ GEMINI_SEARCH = config('GEMINI_SEARCH', default=False, cast=bool)
 MARKET_REFRESH_HOURS = config('MARKET_REFRESH_HOURS', default=24, cast=int)
 NEWS_REFRESH_HOURS = config('NEWS_REFRESH_HOURS', default=6, cast=int)
 FORECAST_FALLBACK_INFLATION = config('FORECAST_FALLBACK_INFLATION', default='6')  # percent per year
+
+
+# Kisan Community (farmers' photo / video feed)
+
+COMMUNITY_MAX_VIDEO_MB = config('COMMUNITY_MAX_VIDEO_MB', default=50, cast=int)
+COMMUNITY_POSTS_PER_DAY = config('COMMUNITY_POSTS_PER_DAY', default=10, cast=int)
+# A post is hidden for admin review once this many different users report it
+COMMUNITY_REPORTS_TO_HIDE = config('COMMUNITY_REPORTS_TO_HIDE', default=3, cast=int)
 
 
 # CORS (React dev server)

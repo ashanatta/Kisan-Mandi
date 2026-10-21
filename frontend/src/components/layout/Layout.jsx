@@ -12,7 +12,7 @@ export default function Layout() {
   }, [pathname])
 
   return (
-    <div className="flex min-h-svh flex-col pb-20 md:pb-0">
+    <div className="flex min-h-svh flex-col pb-20 lg:pb-0">
       <Navbar />
       <main className="flex-1">
         <Outlet />
