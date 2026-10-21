@@ -2,14 +2,15 @@ import { useTranslation } from 'react-i18next'
 import {
   HiOutlineBuildingStorefront,
   HiOutlineChartBar,
-  HiOutlineHome,
   HiOutlineUserCircle,
+  HiOutlineUserGroup,
   HiPlus,
 } from 'react-icons/hi2'
 import { NavLink } from 'react-router-dom'
 
+// Five slots keep "Sell" centred; Home is reachable from the logo in the header.
 const TABS = [
-  { to: '/', key: 'home', Icon: HiOutlineHome, end: true },
+  { to: '/community', key: 'community', Icon: HiOutlineUserGroup },
   { to: '/products', key: 'market', Icon: HiOutlineBuildingStorefront },
   { to: '/sell', key: 'sell', Icon: HiPlus, primary: true },
   { to: '/tracker', key: 'tracker', Icon: HiOutlineChartBar },
@@ -21,7 +22,7 @@ export default function MobileTabBar() {
   const { t } = useTranslation()
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-brand-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-brand-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
       <ul className="grid grid-cols-5">
         {TABS.map(({ to, key, Icon, end, primary }) => (
           <li key={key}>
