@@ -108,6 +108,7 @@ export default function TrackerDashboard() {
         subtitle={t('tracker.subtitle')}
         actions={
           <>
+            <Link to="/tracker/forecast" className="btn-outline">🔮 {t('forecast.short')}</Link>
             <Link to="/tracker/reports" className="btn-outline">
               <HiOutlineDocumentChartBar className="size-5" /> {t('tracker.reports')}
             </Link>

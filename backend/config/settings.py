@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'tracker',
     'payments',
     'chat',
+    'insights',
 ]
 
 MIDDLEWARE = [
@@ -256,6 +257,20 @@ JAZZCASH_RETURN_URL = config('JAZZCASH_RETURN_URL', default='http://127.0.0.1:80
 PLATFORM_BANK_NAME = config('PLATFORM_BANK_NAME', default='')
 PLATFORM_BANK_ACCOUNT_TITLE = config('PLATFORM_BANK_ACCOUNT_TITLE', default='')
 PLATFORM_BANK_ACCOUNT_NUMBER = config('PLATFORM_BANK_ACCOUNT_NUMBER', default='')
+
+
+# Farm forecast & market data (insights app)
+# Free Gemini key: https://aistudio.google.com/apikey – used for advice and Urdu headlines.
+# Without a key, news still works and forecasts use FORECAST_FALLBACK_INFLATION for unknown prices.
+
+GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
+GEMINI_MODEL = config('GEMINI_MODEL', default='gemini-3.5-flash-lite')
+# Daily price search with Google Search grounding. Not available on the free tier: needs billing
+# on the Google project (5,000 searches/month free, then paid). Off = admin enters prices.
+GEMINI_SEARCH = config('GEMINI_SEARCH', default=False, cast=bool)
+MARKET_REFRESH_HOURS = config('MARKET_REFRESH_HOURS', default=24, cast=int)
+NEWS_REFRESH_HOURS = config('NEWS_REFRESH_HOURS', default=6, cast=int)
+FORECAST_FALLBACK_INFLATION = config('FORECAST_FALLBACK_INFLATION', default='6')  # percent per year
 
 
 # CORS (React dev server)
