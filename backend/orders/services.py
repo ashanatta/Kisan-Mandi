@@ -6,13 +6,14 @@ pending/confirmed/shipped/delivered/disputed → it is released to the seller
 (Payout) when the order completes, or returned to the buyer (Refund) when a paid
 order is cancelled or a dispute is decided in the buyer's favour.
 """
+import secrets
 from collections import defaultdict
 from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import F, Sum
+from django.db.models import F, Q, Sum
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
@@ -143,6 +144,8 @@ def change_status(order, new_status, user, note='', system=False):
         raise ValidationError({'status': f'Cannot change a {order.status} order to {new_status}.'})
     if not system and new_status not in allowed_actions(order, user):
         raise PermissionDenied('You are not allowed to make this change.')
+    if not system and new_status == S.DELIVERED:
+        raise ValidationError({'status': "Use the delivery form: enter the buyer's code or upload a proof photo."})
 
     now = timezone.now()
     order.status = new_status
@@ -163,6 +166,50 @@ def change_status(order, new_status, user, note='', system=False):
     order.save()
     OrderStatusHistory.objects.create(order=order, status=new_status, changed_by=user, note=note)
     return order
+
+
+def code_attempts_left(order):
+    return max(settings.MAX_DELIVERY_CODE_ATTEMPTS - order.delivery_code_attempts, 0)
+
+
+def mark_delivered(order, user, code='', proof=None, courier_name='', tracking_number=''):
+    """
+    Seller marks the order delivered, either with the buyer's delivery code
+    (proof the buyer has the goods) or with a proof photo (+ optional tracking).
+    Not atomic as a whole: a wrong code must still count as an attempt.
+    """
+    if user.id != order.seller_id:
+        raise PermissionDenied('Only the seller can mark this order delivered.')
+    if not order.can_transition_to(S.DELIVERED):
+        raise ValidationError({'detail': f'Cannot mark a {order.status} order as delivered.'})
+
+    if code:
+        if not code_attempts_left(order):
+            raise ValidationError({'code': 'Too many wrong codes. Upload a delivery photo instead.'})
+        if not secrets.compare_digest(code.strip(), order.delivery_code):
+            Order.objects.filter(pk=order.pk).update(delivery_code_attempts=F('delivery_code_attempts') + 1)
+            order.refresh_from_db(fields=['delivery_code_attempts'])
+            left = code_attempts_left(order)
+            raise ValidationError({'code': f'Wrong code. {left} tries left.' if left else
+                                           'Wrong code. No tries left – upload a delivery photo instead.'})
+        verified, note = True, "Delivered – buyer's delivery code confirmed"
+    elif proof:
+        verified = False
+        note = 'Delivered without code – proof photo uploaded'
+        if tracking_number:
+            note += f' ({courier_name or "courier"} {tracking_number})'
+    else:
+        raise ValidationError({'detail': "Enter the buyer's delivery code, or upload a proof photo."})
+
+    with transaction.atomic():
+        order.delivery_verified = verified
+        order.courier_name, order.tracking_number = courier_name, tracking_number
+        fields = ['delivery_verified', 'courier_name', 'tracking_number']
+        if proof:
+            order.delivery_proof = proof
+            fields.append('delivery_proof')
+        order.save(update_fields=fields)
+        return change_status(order, S.DELIVERED, user, note=note[:255], system=True)
 
 
 def _restore_stock(order):
@@ -216,6 +263,9 @@ def _add_evidence(dispute, user, images):
 def open_dispute(order, user, reason, description, images=()):
     if not can_open_dispute(order, user):
         raise ValidationError({'detail': 'You can report a problem only after the order is shipped and before it is completed.'})
+    if reason == Dispute.Reason.NOT_RECEIVED and order.delivery_verified:
+        raise ValidationError({'reason': 'You gave your delivery code to the seller, which confirms you received the order. '
+                                         'Choose another reason if something is wrong with it.'})
     dispute = Dispute.objects.create(
         order=order, reason=reason, description=description,
         respond_by=timezone.now() + timedelta(hours=settings.SELLER_RESPONSE_HOURS),
@@ -286,8 +336,12 @@ def run_due_tasks():
     for payment in Payment.objects.filter(status=Payment.Status.PENDING, expires_at__lt=now):
         fail_payment(payment, Payment.Status.EXPIRED, 'Payment time ran out')
 
-    cutoff = now - timedelta(days=settings.PROTECTION_DAYS)
-    for order in Order.objects.filter(status=S.DELIVERED, delivered_at__lt=cutoff):
+    # Deliveries without the buyer's code get a longer window to report "not received".
+    due = (
+        Q(delivery_verified=True, delivered_at__lt=now - timedelta(days=settings.PROTECTION_DAYS))
+        | Q(delivery_verified=False, delivered_at__lt=now - timedelta(days=settings.UNVERIFIED_PROTECTION_DAYS))
+    )
+    for order in Order.objects.filter(due, status=S.DELIVERED):
         change_status(order, S.COMPLETED, None, note='No problem reported – money released automatically', system=True)
 
 

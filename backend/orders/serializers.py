@@ -8,7 +8,7 @@ from payments.gateways import method_mode
 from payments.models import Dispute, DisputeEvidence
 
 from .models import CartItem, Order, OrderItem, OrderStatusHistory
-from .services import allowed_actions, can_open_dispute, qty, tracks_stock
+from .services import allowed_actions, can_open_dispute, code_attempts_left, qty, tracks_stock
 
 
 class CartItemSerializer(serializers.ModelSerializer):
@@ -132,6 +132,9 @@ class OrderSerializer(serializers.ModelSerializer):
     dispute = DisputeSerializer(read_only=True)
     refunds = serializers.SerializerMethodField()
     payout = serializers.SerializerMethodField()
+    delivery_proof = serializers.ImageField(read_only=True)
+    delivery_code = serializers.SerializerMethodField()
+    code_attempts_left = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -140,8 +143,20 @@ class OrderSerializer(serializers.ModelSerializer):
             'payment', 'buyer', 'seller', 'full_name', 'phone', 'address', 'city', 'district', 'notes',
             'subtotal', 'delivery_charge', 'total', 'cancel_reason', 'items', 'status_history',
             'allowed_actions', 'can_dispute', 'paid_at', 'delivered_at', 'completed_at', 'release_at',
-            'dispute', 'refunds', 'payout', 'created_at', 'updated_at',
+            'delivery_code', 'code_attempts_left', 'delivery_verified', 'courier_name', 'tracking_number',
+            'delivery_proof', 'dispute', 'refunds', 'payout', 'created_at', 'updated_at',
         )
+
+    def get_delivery_code(self, order) -> str | None:
+        # Only the buyer sees it, and only while the order is on its way.
+        user = self.context['request'].user
+        on_the_way = order.status in (Order.Status.PENDING, Order.Status.CONFIRMED, Order.Status.SHIPPED)
+        return order.delivery_code if user.id == order.buyer_id and on_the_way else None
+
+    def get_code_attempts_left(self, order) -> int | None:
+        if self.context['request'].user.id != order.seller_id:
+            return None
+        return code_attempts_left(order)
 
     def _party(self, user, order):
         data = PartySerializer(user).data
@@ -197,6 +212,21 @@ class DisputeOpenSerializer(serializers.Serializer):
 class DisputeRespondSerializer(serializers.Serializer):
     response = serializers.CharField(max_length=2000, required=False, allow_blank=True)
     images = serializers.ListField(child=serializers.ImageField(), required=False, max_length=6)
+
+
+class DeliverSerializer(serializers.Serializer):
+    """Either the buyer's 4-digit code, or a proof photo (with optional courier tracking)."""
+
+    code = serializers.RegexField(r'^\s*\d{4}\s*$', required=False, allow_blank=True,
+                                  error_messages={'invalid': 'The code has 4 digits.'})
+    proof = serializers.ImageField(required=False)
+    courier_name = serializers.CharField(max_length=60, required=False, allow_blank=True)
+    tracking_number = serializers.CharField(max_length=60, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if not attrs.get('code') and not attrs.get('proof'):
+            raise serializers.ValidationError({'detail': "Enter the buyer's delivery code, or upload a proof photo."})
+        return attrs
 
 
 class StatusUpdateSerializer(serializers.Serializer):

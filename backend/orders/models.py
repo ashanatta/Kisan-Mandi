@@ -1,5 +1,7 @@
+import secrets
 import uuid
 from decimal import Decimal
+from pathlib import Path
 
 from django.conf import settings
 from django.core.validators import MinValueValidator
@@ -36,6 +38,14 @@ def generate_order_number():
     return 'AGR-' + uuid.uuid4().hex[:10].upper()
 
 
+def generate_delivery_code():
+    return f'{secrets.randbelow(10000):04d}'
+
+
+def delivery_proof_path(instance, filename):
+    return f'deliveries/{uuid.uuid4().hex}{Path(filename).suffix.lower()}'
+
+
 class Order(models.Model):
     """
     Checkout splits the cart into one order per seller, so each seller
@@ -46,6 +56,12 @@ class Order(models.Model):
     → completed (buyer confirmed or protection window passed; money released to seller).
     A buyer can open a dispute while shipped/delivered → disputed → admin decides
     → refunded or completed. Cancelling a paid order refunds the buyer in full.
+
+    Proof of delivery: the buyer gets a secret `delivery_code` and gives it to the
+    seller only when the goods are in hand. A delivery confirmed with the code is
+    proof the buyer received it ("not received" disputes are then not allowed).
+    Without the code the seller must upload a proof photo, and the buyer gets a
+    longer protection window.
     """
 
     class Status(models.TextChoices):
@@ -96,6 +112,14 @@ class Order(models.Model):
     delivered_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
+    # Proof of delivery
+    delivery_code = models.CharField(max_length=4, default=generate_delivery_code, editable=False)
+    delivery_code_attempts = models.PositiveSmallIntegerField(default=0, help_text='Wrong codes entered by the seller')
+    delivery_verified = models.BooleanField(default=False, help_text="Delivered with the buyer's code")
+    courier_name = models.CharField(max_length=60, blank=True)
+    tracking_number = models.CharField(max_length=60, blank=True)
+    delivery_proof = models.ImageField(upload_to=delivery_proof_path, blank=True)
+
     # Shipping details (copied at checkout)
     full_name = models.CharField(max_length=150)
     phone = models.CharField(max_length=13)
@@ -131,7 +155,8 @@ class Order(models.Model):
 
         if self.status != self.Status.DELIVERED or not self.delivered_at:
             return None
-        return self.delivered_at + timedelta(days=conf.PROTECTION_DAYS)
+        days = conf.PROTECTION_DAYS if self.delivery_verified else conf.UNVERIFIED_PROTECTION_DAYS
+        return self.delivered_at + timedelta(days=days)
 
     def recalculate_totals(self):
         self.subtotal = sum((item.line_total for item in self.items.all()), Decimal('0'))
